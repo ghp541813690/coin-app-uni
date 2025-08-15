@@ -187,6 +187,21 @@
       </view>
     </view>
 
+    <!-- 表单配置 -->
+    <view class="config-section">
+      <text class="section-title">表单 JSON 配置</text>
+      <textarea 
+        v-model="formSchemaJson"
+        class="setting-textarea"
+        style="height: 260rpx; width: 100%;"
+        placeholder="在此粘贴/编辑表单JSON配置"
+      />
+      <view style="margin-top: 16rpx; display:flex; gap: 20rpx;">
+        <button class="add-btn" @click="saveFormSchema">保存配置</button>
+        <button class="remove-btn" @click="resetFormSchema">恢复默认</button>
+      </view>
+    </view>
+
     <!-- 设置面板 -->
     <view class="settings-section">
       <text class="section-title">通知设置</text>
@@ -281,6 +296,17 @@ export default {
       showNotification: true,
       notificationTitle: '检测到应用启动: {app}',
       notificationContent: '应用 {app} 已启动\n时间: {time}',
+
+      // 表单 JSON 配置（可编辑）
+      formSchemaJson: JSON.stringify({
+        title: '应用处置表单',
+        description: '请根据实际情况填写以下内容',
+        fields: [
+          { key: 'reason', label: '原因', type: 'textarea', required: true, placeholder: '请输入原因' },
+          { key: 'limitTime', label: '限制时长(分钟)', type: 'number', placeholder: '例如 30' },
+          { key: 'notify', label: '通知我', type: 'switch' }
+        ]
+      }, null, 2),
       
       // H5 弹窗相关数据
       enableH5Popup: true,
@@ -493,16 +519,22 @@ export default {
       // 处理弹窗操作
       switch (action.action) {
         case 'confirm':
-          uni.showToast({
-            title: '确认操作',
-            icon: 'success'
-          })
+          // 保存上下文并跳转到自定义表单页
+          try {
+            const schema = JSON.parse(this.formSchemaJson)
+            uni.setStorageSync('custom_form_schema', JSON.stringify(schema))
+          } catch (e) {
+            uni.showToast({ title: '表单配置不合法，已使用默认', icon: 'none' })
+            uni.removeStorageSync('custom_form_schema')
+          }
+          if (this.currentAppInfo) {
+            uni.setStorageSync('custom_form_context', JSON.stringify(this.currentAppInfo))
+          }
+          uni.navigateTo({ url: '/pages/custom-form/index' })
           break
-        case 'cancel':
-          uni.showToast({
-            title: '取消操作',
-            icon: 'none'
-          })
+        case 'close':
+          // 关闭
+          this.closeH5Popup()
           break
         default:
           console.log('未知操作:', action.action)

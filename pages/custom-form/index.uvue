@@ -1,0 +1,338 @@
+<template>
+  <view class="container">
+    <view class="header">
+      <text class="title">{{ schema.title || '自定义表单' }}</text>
+      <text class="desc" v-if="schema.description">{{ schema.description }}</text>
+    </view>
+
+    <view class="context-card" v-if="appInfo">
+      <text class="context-title">应用信息</text>
+      <view class="context-row"><text class="label">名称</text><text class="value">{{ appInfo.appName }}</text></view>
+      <view class="context-row"><text class="label">包名</text><text class="value">{{ appInfo.packageName }}</text></view>
+      <view class="context-row"><text class="label">时间</text><text class="value">{{ formatTime(appInfo.launchTime) }}</text></view>
+    </view>
+
+    <view class="form-card">
+      <view 
+        v-for="(field, idx) in schema.fields" 
+        :key="field.key || idx" 
+        class="form-item"
+      >
+        <text class="form-label">
+          {{ field.label || field.key }}
+          <text v-if="field.required" class="required">*</text>
+        </text>
+
+        <!-- 文本输入 -->
+        <input 
+          v-if="field.type === 'text' || field.type === 'number'"
+          :type="field.type === 'number' ? 'digit' : 'text'"
+          class="form-input"
+          :placeholder="field.placeholder || ''"
+          v-model="formValues[field.key]"
+        />
+
+        <!-- 多行文本 -->
+        <textarea
+          v-else-if="field.type === 'textarea'"
+          class="form-textarea"
+          :placeholder="field.placeholder || ''"
+          v-model="formValues[field.key]"
+        />
+
+        <!-- 选择器 -->
+        <picker 
+          v-else-if="field.type === 'select'"
+          :range="field.options || []"
+          :value="selectIndex(field)"
+          @change="(e) => onSelectChange(e, field)"
+        >
+          <view class="picker-display">{{ displaySelect(field) }}</view>
+        </picker>
+
+        <!-- 开关 -->
+        <switch 
+          v-else-if="field.type === 'switch'"
+          v-model="formValues[field.key]"
+        />
+
+        <!-- 日期 -->
+        <picker 
+          v-else-if="field.type === 'date'"
+          mode="date"
+          :value="formValues[field.key] || ''"
+          @change="(e) => formValues[field.key] = e.detail.value"
+        >
+          <view class="picker-display">{{ formValues[field.key] || '选择日期' }}</view>
+        </picker>
+
+        <!-- 时间 -->
+        <picker 
+          v-else-if="field.type === 'time'"
+          mode="time"
+          :value="formValues[field.key] || ''"
+          @change="(e) => formValues[field.key] = e.detail.value"
+        >
+          <view class="picker-display">{{ formValues[field.key] || '选择时间' }}</view>
+        </picker>
+
+        <!-- 未识别类型回退为文本 -->
+        <input 
+          v-else
+          type="text"
+          class="form-input"
+          :placeholder="field.placeholder || ''"
+          v-model="formValues[field.key]"
+        />
+
+        <text v-if="errors[field.key]" class="error">{{ errors[field.key] }}</text>
+      </view>
+    </view>
+
+    <view class="footer">
+      <button class="btn secondary" @click="onCancel">取消</button>
+      <button class="btn primary" @click="onSubmit">提交</button>
+    </view>
+  </view>
+</template>
+
+<script>
+interface AppInfo {
+  packageName: string;
+  appName: string;
+  launchTime: number;
+  pid?: number;
+}
+
+interface FieldOption { label: string; value: any }
+
+interface FormField {
+  key: string;
+  label?: string;
+  type: 'text' | 'number' | 'textarea' | 'select' | 'switch' | 'date' | 'time';
+  required?: boolean;
+  placeholder?: string;
+  options?: Array<string | FieldOption>;
+}
+
+interface FormSchema {
+  title?: string;
+  description?: string;
+  fields: FormField[];
+  submitText?: string;
+  cancelText?: string;
+}
+
+export default {
+  data() {
+    return {
+      schema: { title: '自定义表单', fields: [] as FormField[] } as FormSchema,
+      formValues: {} as Record<string, any>,
+      errors: {} as Record<string, string>,
+      appInfo: null as AppInfo | null
+    }
+  },
+
+  onLoad() {
+    this.loadSchema()
+  },
+
+  methods: {
+    loadSchema() {
+      try {
+        const raw = uni.getStorageSync('custom_form_schema') as string
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          this.schema = parsed
+          // 初始化默认值
+          this.schema.fields.forEach((f: FormField) => {
+            if (this.formValues[f.key] === undefined) {
+              if (f.type === 'switch') this.formValues[f.key] = false
+              else this.formValues[f.key] = ''
+            }
+          })
+        } else {
+          this.schema = {
+            title: '应用处置表单',
+            description: '请根据实际情况填写以下内容',
+            fields: [
+              { key: 'reason', label: '原因', type: 'textarea', required: true, placeholder: '请输入原因' },
+              { key: 'limitTime', label: '限制时长(分钟)', type: 'number', required: false, placeholder: '例如 30' },
+              { key: 'notify', label: '通知我', type: 'switch' }
+            ],
+            submitText: '提交',
+            cancelText: '取消'
+          }
+        }
+      } catch (e) {
+        console.error('表单配置解析失败', e)
+      }
+
+      try {
+        const ctx = uni.getStorageSync('custom_form_context') as string
+        if (ctx) {
+          this.appInfo = JSON.parse(ctx)
+        }
+      } catch {}
+    },
+
+    selectIndex(field: any): number {
+      const val = this.formValues[field.key]
+      const options = field.options || []
+      const idx = options.findIndex((opt: any) => {
+        if (typeof opt === 'string') return opt === val
+        return opt && opt.value === val
+      })
+      return idx >= 0 ? idx : 0
+    },
+
+    displaySelect(field: any): string {
+      const options = field.options || []
+      const idx = this.selectIndex(field)
+      const opt = options[idx]
+      if (typeof opt === 'string') return opt
+      return (opt && opt.label) || ''
+    },
+
+    onSelectChange(e: any, field: any) {
+      const idx = e.detail.value
+      const options = field.options || []
+      const opt = options[idx]
+      this.formValues[field.key] = typeof opt === 'string' ? opt : (opt ? opt.value : '')
+    },
+
+    validate(): boolean {
+      this.errors = {}
+      for (const f of this.schema.fields) {
+        const v = this.formValues[f.key]
+        if (f.required && (v === '' || v === null || v === undefined)) {
+          this.errors[f.key] = '必填项'
+        }
+      }
+      return Object.keys(this.errors).length === 0
+    },
+
+    onCancel() {
+      uni.navigateBack({ delta: 1 })
+    },
+
+    onSubmit() {
+      if (!this.validate()) {
+        uni.showToast({ title: '请完善必填项', icon: 'none' })
+        return
+      }
+      // 提交结果（可发请求或存储本地）
+      const result = {
+        values: this.formValues,
+        appInfo: this.appInfo,
+        timestamp: Date.now()
+      }
+      uni.setStorageSync('custom_form_submission', JSON.stringify(result))
+      uni.showToast({ title: '提交成功', icon: 'success' })
+      setTimeout(() => {
+        uni.navigateBack({ delta: 1 })
+      }, 600)
+    },
+
+    formatTime(ts: number): string {
+      const d = new Date(ts)
+      return d.toLocaleString()
+    }
+  }
+}
+</script>
+
+<style>
+.container {
+  padding: 24rpx;
+}
+.header {
+  margin-bottom: 20rpx;
+}
+.title {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #333;
+}
+.desc {
+  margin-top: 8rpx;
+  color: #666;
+  font-size: 26rpx;
+}
+.context-card {
+  background: #f8f9fa;
+  border: 1rpx solid #e9ecef;
+  border-radius: 12rpx;
+  padding: 20rpx;
+  margin-bottom: 20rpx;
+}
+.context-title {
+  font-size: 28rpx;
+  color: #333;
+  font-weight: bold;
+  margin-bottom: 12rpx;
+}
+.context-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10rpx 0;
+}
+.label { color: #666; font-size: 26rpx; }
+.value { color: #333; font-size: 26rpx; }
+
+.form-card {
+  background: #fff;
+  border-radius: 12rpx;
+  padding: 20rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.06);
+}
+.form-item {
+  margin-bottom: 22rpx;
+}
+.form-label {
+  display: block;
+  font-size: 28rpx;
+  color: #333;
+  margin-bottom: 10rpx;
+}
+.required { color: #F44336; margin-left: 4rpx; }
+.form-input {
+  border: 1rpx solid #ddd;
+  border-radius: 8rpx;
+  height: 72rpx;
+  padding: 0 20rpx;
+  font-size: 28rpx;
+}
+.form-textarea {
+  border: 1rpx solid #ddd;
+  border-radius: 8rpx;
+  height: 180rpx;
+  padding: 16rpx 20rpx;
+  font-size: 28rpx;
+}
+.picker-display {
+  border: 1rpx solid #ddd;
+  border-radius: 8rpx;
+  height: 72rpx;
+  padding: 0 20rpx;
+  display: flex;
+  align-items: center;
+  font-size: 28rpx;
+}
+.error { color: #F44336; font-size: 24rpx; margin-top: 6rpx; display: block; }
+
+.footer {
+  margin-top: 24rpx;
+  display: flex;
+  gap: 20rpx;
+}
+.btn {
+  flex: 1;
+  height: 80rpx;
+  border-radius: 8rpx;
+  border: none;
+  font-size: 28rpx;
+}
+.btn.primary { background: #4CAF50; color: #fff; }
+.btn.secondary { background: #f5f5f5; color: #666; border: 1rpx solid #ddd; }
+</style>

@@ -28,6 +28,14 @@
 				"navigationBarBackgroundColor": "#2196F3",
 				"navigationBarTextStyle": "white"
 			}
+		},
+		{
+			"path": "pages/custom-form/index",
+			"style": {
+				"navigationBarTitleText": "自定义表单",
+				"navigationBarBackgroundColor": "#4CAF50",
+				"navigationBarTextStyle": "white"
+			}
 		}
 	],
 	"globalStyle": {
