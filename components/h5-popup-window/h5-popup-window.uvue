@@ -239,9 +239,9 @@ export default {
           action: 'confirm'
         },
         {
-          text: '取消',
+          text: '关闭',
           type: 'secondary',
-          action: 'cancel'
+          action: 'close'
         }
       ]
     },
@@ -467,7 +467,7 @@ export default {
         appInfo: this.appInfo
       })
 
-      if (action.action === 'confirm' || action.action === 'cancel') {
+      if (action.action === 'confirm' || action.action === 'close') {
         this.close()
       }
     },
