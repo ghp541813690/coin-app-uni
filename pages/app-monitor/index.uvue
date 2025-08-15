@@ -196,7 +196,7 @@
         style="height: 260rpx; width: 100%;"
         placeholder="在此粘贴/编辑表单JSON配置"
       />
-      <view style="margin-top: 16rpx; display:flex; gap: 20rpx;">
+      <view style="margin-top: 16rpx; display: flex; gap: 20rpx;">
         <button class="add-btn" @click="saveFormSchema">保存配置</button>
         <button class="remove-btn" @click="resetFormSchema">恢复默认</button>
       </view>
@@ -579,6 +579,29 @@ export default {
         return `应用 ${this.currentAppInfo.appName} 已启动！\n启动时间: ${this.formatTime(this.currentAppInfo.launchTime)}`
       }
       return '应用已启动！'
+    },
+
+    saveFormSchema() {
+      try {
+        const schema = JSON.parse(this.formSchemaJson)
+        uni.setStorageSync('custom_form_schema', JSON.stringify(schema))
+        uni.showToast({ title: '表单配置已保存', icon: 'success' })
+      } catch (e) {
+        uni.showToast({ title: 'JSON 格式错误', icon: 'none' })
+      }
+    },
+
+    resetFormSchema() {
+      this.formSchemaJson = JSON.stringify({
+        title: '应用处置表单',
+        description: '请根据实际情况填写以下内容',
+        fields: [
+          { key: 'reason', label: '原因', type: 'textarea', required: true, placeholder: '请输入原因' },
+          { key: 'limitTime', label: '限制时长(分钟)', type: 'number', placeholder: '例如 30' },
+          { key: 'notify', label: '通知我', type: 'switch' }
+        ]
+      }, null, 2)
+      uni.showToast({ title: '已恢复默认配置', icon: 'success' })
     }
   }
 }
