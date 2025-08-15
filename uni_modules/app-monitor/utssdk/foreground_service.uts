@@ -1,0 +1,135 @@
+// #ifdef APP-ANDROID
+import { UTSAndroid } from "io.dcloud.uts";
+import android.app.Service;
+import android.content.Intent;
+import android.os.IBinder;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.app.usage.UsageEvents;
+import android.app.usage.UsageStatsManager;
+
+/**
+ * 持续监控的前台服务
+ */
+export class AppMonitorForegroundService extends Service {
+    private handler: Handler = new Handler(Looper.getMainLooper());
+    private usageStatsManager: UsageStatsManager = null as any;
+    private lastCheckTime: number = Date.now();
+    private isRunning: boolean = false;
+    private checkIntervalMs: number = 2000;
+
+    onCreate(): void {
+        super.onCreate();
+        this.usageStatsManager = this.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager;
+        this.startAsForeground();
+        this.isRunning = true;
+        this.scheduleNext();
+    }
+
+    onStartCommand(intent: Intent | null, flags: number, startId: number): number {
+        // 可通过 Intent 传入自定义间隔
+        try {
+            if (intent) {
+                const ms = intent.getLongExtra("interval", -1);
+                if (ms && ms > 0) this.checkIntervalMs = ms;
+            }
+        } catch {}
+        return Service.START_STICKY;
+    }
+
+    onDestroy(): void {
+        this.isRunning = false;
+        this.handler.removeCallbacksAndMessages(null);
+        super.onDestroy();
+    }
+
+    onBind(intent: Intent | null): IBinder | null {
+        return null;
+    }
+
+    private startAsForeground(): void {
+        const channelId = "app_monitor_fg";
+        const nm = this.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            const ch = new NotificationChannel(channelId, "应用监控", NotificationManager.IMPORTANCE_MIN);
+            ch.setDescription("持续监控前台服务");
+            nm.createNotificationChannel(ch);
+        }
+
+        const activity = UTSAndroid.getUniActivity();
+        const pending = PendingIntent.getActivity(
+            this,
+            0,
+            activity.getIntent(),
+            Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_IMMUTABLE : 0
+        );
+
+        const notification = new Notification.Builder(this, channelId)
+            .setContentTitle("应用监控运行中")
+            .setContentText("正在持续监控前台应用切换…")
+            .setSmallIcon(android.R.drawable.stat_notify_sync)
+            .setContentIntent(pending)
+            .setOngoing(true)
+            .build();
+        this.startForeground(1001, notification);
+    }
+
+    private scheduleNext(): void {
+        if (!this.isRunning) return;
+        this.handler.postDelayed(() => {
+            try {
+                this.checkOnce();
+            } catch (e) {
+                // swallow
+            } finally {
+                this.scheduleNext();
+            }
+        }, this.checkIntervalMs);
+    }
+
+    private checkOnce(): void {
+        const end = Date.now();
+        const start = this.lastCheckTime;
+        this.lastCheckTime = end;
+        const events = this.usageStatsManager.queryEvents(start, end);
+        const event = new UsageEvents.Event();
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event);
+            if (event.getEventType() == UsageEvents.Event.MOVE_TO_FOREGROUND) {
+                const pkg = event.getPackageName();
+                // 通过广播通知 App 进程，避免跨进程直接访问 uni.$emit
+                const intent = new Intent("app.monitor.APP_LAUNCHED");
+                intent.putExtra("package", pkg);
+                intent.putExtra("time", end);
+                this.sendBroadcast(intent);
+            }
+        }
+    }
+}
+
+/**
+ * 辅助方法：启动/停止前台服务
+ */
+export function startAppMonitorForegroundService(context?: Context, intervalMs?: number): void {
+    const ctx = context || UTSAndroid.getUniActivity();
+    const intent = new Intent(ctx, AppMonitorForegroundService.class);
+    if (intervalMs && intervalMs > 0) intent.putExtra("interval", intervalMs);
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        ctx.startForegroundService(intent);
+    } else {
+        ctx.startService(intent);
+    }
+}
+
+export function stopAppMonitorForegroundService(context?: Context): void {
+    const ctx = context || UTSAndroid.getUniActivity();
+    const intent = new Intent(ctx, AppMonitorForegroundService.class);
+    ctx.stopService(intent);
+}
+// #endif

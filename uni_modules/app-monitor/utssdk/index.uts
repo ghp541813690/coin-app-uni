@@ -27,6 +27,8 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+
+import { startAppMonitorForegroundService, stopAppMonitorForegroundService } from './foreground_service.uts'
 // #endif
 
 // iOS 相关导入
@@ -72,6 +74,7 @@ export class AppMonitor {
     private notificationManager: NotificationManager;
     private handler: Handler;
     private checkRunnable: Runnable;
+    private receiver: BroadcastReceiver | null = null;
     // #endif
     
     // iOS 相关属性
@@ -93,6 +96,8 @@ export class AppMonitor {
             }
         });
         this.createNotificationChannel();
+        // 注册广播接收器，接收前台服务的事件
+        this.registerReceiver();
         // #endif
         
         // #ifdef APP-IOS
@@ -101,7 +106,7 @@ export class AppMonitor {
     }
 
     /**
-     * 开始监听
+     * 开始监听（应用进程内的定时查询）
      */
     public startMonitoring(): void {
         if (this.isMonitoring) {
@@ -124,7 +129,7 @@ export class AppMonitor {
     }
 
     /**
-     * 停止监听
+     * 停止监听（应用进程内的定时查询）
      */
     public stopMonitoring(): void {
         if (!this.isMonitoring) {
@@ -144,6 +149,18 @@ export class AppMonitor {
         
         console.log("应用监听器已停止");
     }
+
+    /**
+     * 启动/停止 Android 前台服务（持续监控）
+     */
+    // #ifdef APP-ANDROID
+    public startForegroundService(): void {
+        startAppMonitorForegroundService(this.context, this.config.checkInterval);
+    }
+    public stopForegroundService(): void {
+        stopAppMonitorForegroundService(this.context);
+    }
+    // #endif
 
     /**
      * 更新配置
@@ -232,6 +249,37 @@ export class AppMonitor {
             // 出错后继续监听
             this.handler.postDelayed(this.checkRunnable, this.config.checkInterval);
         }
+    }
+
+    private registerReceiver(): void {
+        if (this.receiver) return;
+        this.receiver = new BroadcastReceiver({
+            onReceive: (context: Context, intent: Intent) => {
+                try {
+                    if ("app.monitor.APP_LAUNCHED" == intent.getAction()) {
+                        const pkg = intent.getStringExtra("package") || "";
+                        if (!pkg) return;
+                        if (!this.isTargetApp(pkg)) return;
+                        const info = this.getAppInfo(pkg);
+                        if (info) this.onAppLaunched(info);
+                    }
+                } catch (e) {
+                    console.error("接收服务事件失败", e);
+                }
+            }
+        });
+        const filter = new IntentFilter();
+        filter.addAction("app.monitor.APP_LAUNCHED");
+        this.context.registerReceiver(this.receiver, filter);
+    }
+
+    private unregisterReceiver(): void {
+        try {
+            if (this.receiver) {
+                this.context.unregisterReceiver(this.receiver);
+                this.receiver = null;
+            }
+        } catch {}
     }
 
     private isTargetApp(packageName: string): boolean {
