@@ -1,0 +1,20 @@
+{
+  "module": {
+    "name": "uni_modules__android_keeplive",
+    "type": "har",
+    "deviceTypes": [
+      "default",
+      "tablet",
+      "2in1"
+    ],
+    "requestPermissions": [
+		{
+		  "name": "ohos.permission.KEEP_BACKGROUND_RUNNING",
+		  "reason": "$string:Harmony_keep_permission_reason",
+		  "usedScene": {
+		    "when": "always"
+		  }
+		}
+    ]
+  }
+}

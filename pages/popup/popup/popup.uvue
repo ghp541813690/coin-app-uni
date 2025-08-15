@@ -1,0 +1,56 @@
+<template>
+	<!-- #ifdef APP -->
+	<scroll-view style="flex:1">
+	<!-- #endif -->
+	
+	<view class="content">
+	        <button style="margin: 10rpx;" type="primary" @click="onClick(0)">检测是否有使用记录权限</button>
+	        <button style="margin: 10rpx;" type="primary" @click="onClick(1)">申请使用记录权限</button>
+	        <button style="margin: 10rpx;" type="primary" @click="onClick(2)">开启监听手机前后台应用</button>
+	        <button style="margin: 10rpx;" type="primary" @click="onClick(3)">取消监听手机前后台应用</button>
+	    </view>
+		
+	<!-- #ifdef APP -->
+	</scroll-view>
+	<!-- #endif -->
+</template>
+
+<script>
+	
+import {hasUsageStatsPermission,requestUsageStatsPermission,appListener,stopAppListener} from "@/uni_modules/xtf-usage"
+	
+	export default {
+		data() {
+			return {
+				
+			}
+		},
+		methods: {
+			onClick(id){
+				var that=this;
+				if(id==0){
+
+					uni.showToast({
+						icon:"none",
+						title:""+hasUsageStatsPermission()
+					})
+				}else if(id==1){
+					requestUsageStatsPermission();
+				}else if(id==2){
+					appListener(function(b,pkg){
+						console.log(b,pkg);
+
+					})
+				}else if(id==3){
+					stopAppListener();
+				}else if(id==4){
+				}
+			},
+			
+		}
+	}
+</script>
+
+<style>
+
+</style>

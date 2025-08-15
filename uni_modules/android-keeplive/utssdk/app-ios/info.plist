@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+	<!-- 后台模式声明 -->
+	<key>UIBackgroundModes</key>
+	<array>
+	    <string>audio</string> <!-- 基础音频权限 -->
+		<string>fetch</string>  <!-- 后台数据获取 -->
+	</array>
+	 <key>NSUserNotificationsUsageDescription</key>
+	    <string>发送重要提醒和更新</string>
+	<!-- iOS 19+新增隐私声明 -->
+	<key>NSBackgroundAudioServicesEnabled</key>
+	<string>需要持续后台音频使应用持续运行</string>
+
+  </dict>
+</plist>

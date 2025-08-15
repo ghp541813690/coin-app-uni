@@ -1,0 +1,139 @@
+<template>
+	<view>
+		 <web-view id="web-view" src="http://situai.cn:8101"></web-view>
+	</view>
+</template>
+<script lang="uts">
+// #ifdef APP-ANDROID
+import { KeepLive } from '@/uni_modules/android-keeplive'
+// import { isProviderEnabled, openLocSetting,  onStartLocs,LocData,stop,LocationData} from "@/uni_modules/xtf-gpslocation"
+// #endif
+	
+	let firstBackTime = 0
+	export default {
+		onLaunch: function () {
+			console.log('App Launch')
+		},
+		onShow: function () {
+			console.log('App Show')
+			// this.test();
+		},
+		onHide: function () {
+			console.log('App Hide')
+		},
+		// #ifdef APP-ANDROID
+		onLastPageBackPress: function () {
+			console.log('App LastPageBackPress')
+			if (firstBackTime == 0) {
+				uni.showToast({
+					title: '再按一次退出应用',
+					position: 'bottom',
+				})
+				firstBackTime = Date.now()
+				setTimeout(() => {
+					firstBackTime = 0
+				}, 2000)
+			} else if (Date.now() - firstBackTime < 2000) {
+				firstBackTime = Date.now()
+				uni.exit()
+			}
+		},
+		// #endif
+		onExit: function () {
+			console.log('App Exit')
+		},
+		methods: {
+				
+			test: function() {
+				
+				//<!-- ------------------------------下方代码需要放进方法中-------------------------------------------------- -->  
+				// #ifdef APP-ANDROID
+				var keep=new KeepLive();
+				keep.setTitle("app");
+				keep.setContent("app is runing");
+				// keep.setLargeIcon("icon");
+				keep.setSmallIcon("icon"); //图标名字  图标放在 插件下面的 uni_modules\android-keeplive\utssdk\app-android\res 文件夹下
+				keep.onAddBackgroundCallback(function(res:boolean){
+				    console.log("后台运行 "+res)
+				
+				})
+				keep.onAddScrrenListenerCallback(function(res:boolean){
+				    console.log("屏幕开启状态 "+res)
+				
+				})  
+				keep.setWakeLock(1,"keeptag");// 设置唤醒类型
+				
+				if(!keep.checkAppNotification()){
+				    keep.onOpenNotificationSetting(function(res:boolean){
+				        keep.register();
+				        var ignoring=  keep.isIgnoringBatteryOptimizations();
+				        if(!ignoring){
+				            keep.requestIgnoreBatteryOptimizations();
+				        }
+				    })
+				}else{
+				    keep.register();
+				    var ignoring=  keep.isIgnoringBatteryOptimizations();
+				    if(!ignoring){
+				        keep.requestIgnoreBatteryOptimizations();
+				    }
+				}
+				// 稳定定时器 需要的用户使用（默认定时器1 ）
+				keep.onStartCSystemTimer(120,function(){
+				    console.log("onStartCSystemTimer ");
+				    keep.acquire(1000);// 唤醒一秒钟
+				});
+				
+				keep.register();
+				var run=keep.isRunning();
+				if(!run){
+					keep.restart();
+				}
+				
+				var onT=keep.checkAppNotification();
+				if(!onT){
+					keep.goNotificationSetting();
+				}
+				keep.doStartApplicationWithPackageName("com.situ.coin");
+				var ignoring=  keep.isIgnoringBatteryOptimizations();
+				if(ignoring){
+					keep.requestIgnoreBatteryOptimizations();
+				keep.setBackgroundMusicEnabled(true);
+				}
+				// 需要插件增加程序后台运行能力的可以加下面代码 想程序始终保持活性（即稳定推送 scocket等）（体验好） 还是建议用户打开系统设置 启动项 后台运行
+				keep.wifilock();//部分手机可能会断
+				// 定时器时间改成10秒 去掉上方的
+				keep.onStartCSystemTimer(10,function(){
+				 console.log("onStartCSystemTimer ");
+				 keep.acquire(1000);// 唤醒一秒钟
+				});
+				keep.setNotifaicationSoundEnable(true);
+				keep.hideNotification(true);
+				keep.setWakeLock(1,"tag");
+				keep.releaseAcquire();
+				keep.setMusicVol(0) // 0~1 范围
+				keep.setMusicId("music")  
+				
+				keep.goAndroidSystemAppSetting();
+				keep.hideRecentTask(true);// 隐藏
+				keep.setCrashRestartUIEnabled(true);
+				keep.wifilock();// 休眠时锁定wifi
+				keep.wifiunlock();// 休眠时取消锁定wifi
+				keep.toBackground();
+				
+				// #endif
+			}
+		},
+	}
+</script>
+
+<style>
+	/*每个页面公共css */
+	.uni-row {
+		flex-direction: row;
+	}
+
+	.uni-column {
+		flex-direction: column;
+	}
+</style>

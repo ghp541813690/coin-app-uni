@@ -1,0 +1,36 @@
+<template>
+	<web-view
+	  src="http://situai.cn:8101" 
+	  :webview-styles="{ userAgent: 'Mozilla/5.0 ...' }"
+	></web-view>
+</template>
+
+<script>
+	export default {
+		data() {
+			return {
+				title: 'Hello'
+			}
+		},
+		onLoad() {
+
+		},
+		methods: {
+
+		}
+	}
+</script>
+
+<style>
+	.logo {
+		height: 100px;
+		width: 100px;
+		margin: 100px auto 25px auto;
+	}
+
+	.title {
+		font-size: 18px;
+		color: #8f8f94;
+    text-align: center;
+	}
+</style>

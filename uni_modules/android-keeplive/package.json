@@ -1,0 +1,109 @@
+{
+  "id": "android-keeplive",
+  "displayName": "安卓保活 ios保活 鸿蒙保活 保应用程序稳定后台运行(uniapp，uniappx保活 长期维护）",
+  "version": "1.1.65",
+  "description": "android保活/ios保活/鸿蒙保活 为应用程序提供一个稳定的后台运行环境，为您的应用程序保驾护航，防止程序后台被杀，程序唤醒，息屏唤醒，增加程序活性,优化代码执行,保活稳定",
+  "keywords": [
+    "保活",
+    "安卓保活",
+    "",
+    "ios保活",
+    "Android保活",
+    "",
+    "稳定定时器"
+],
+  "repository": "",
+  "engines": {
+    "HBuilderX": "^3.99",
+    "uni-app": "^4.07",
+    "uni-app-x": "^4.07"
+  },
+  "dcloudext": {
+    "type": "uts",
+    "sale": {
+      "regular": {
+        "price": "19.99"
+      },
+      "sourcecode": {
+        "price": "666.66"
+      }
+    },
+    "contact": {
+      "qq": "1530948626"
+    },
+    "declaration": {
+      "ads": "无",
+      "data": "插件不采集任何数据",
+      "permissions": "  <uses-permission android:name=\"android.permission.START_ACTIVITIES\" />\n    <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\" />\n    <uses-permission android:name=\"android.permission.RECEIVE_BOOT_COMPLETED\" />\n    <uses-permission android:name=\"android.permission.GET_TASKS\" />\n    <uses-permission android:name=\"android.permission.SCHEDULE_EXACT_ALARM\" />\n    <uses-permission android:name=\"android.permission.SET_ALARM\"/>\n    <uses-permission android:name=\"android.permission.USE_EXACT_ALARM\"/>\n    <uses-permission android:name=\"android.permission.SCHEDULE_EXACT_ALARM\" />\n    <uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\" />\n    <uses-permission android:name=\"android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS\" />\n    <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK\"/>"
+    },
+    "npmurl": "",
+    "darkmode": "√",
+    "i18n": "√",
+    "widescreen": "√"
+  },
+  "uni_modules": {
+    "dependencies": [],
+    "encrypt": [],
+    "platforms": {
+      "cloud": {
+        "tcb": "√",
+        "aliyun": "√",
+        "alipay": "√"
+      },
+      "client": {
+        "uni-app": {
+          "vue": {
+            "vue2": "√",
+            "vue3": "√"
+          },
+          "web": {
+            "safari": "-",
+            "chrome": "-"
+          },
+          "app": {
+            "vue": "√",
+            "nvue": "√",
+            "android": {
+                "extVersion": "",
+                "minVersion": "21"
+            },
+            "ios": "√",
+            "harmony": "√"
+          },
+          "mp": {
+            "weixin": "-",
+            "alipay": "-",
+            "toutiao": "-",
+            "baidu": "-",
+            "kuaishou": "-",
+            "jd": "-",
+            "harmony": "-",
+            "qq": "-",
+            "lark": "-"
+          },
+          "quickapp": {
+            "huawei": "-",
+            "union": "-"
+          }
+        },
+        "uni-app-x": {
+          "web": {
+            "safari": "-",
+            "chrome": "-"
+          },
+          "app": {
+            "android": {
+                "extVersion": "",
+                "minVersion": "21"
+            },
+            "ios": "√",
+            "harmony": "√"
+          },
+          "mp": {
+            "weixin": "-"
+          }
+        }
+      }
+    }
+  }
+}
