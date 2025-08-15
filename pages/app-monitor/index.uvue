@@ -1,0 +1,526 @@
+<template>
+  <view class="container">
+    <!-- 状态栏 -->
+    <view class="status-bar">
+      <view class="status-item">
+        <text class="status-label">监听状态:</text>
+        <text :class="['status-value', isMonitoring ? 'active' : 'inactive']">
+          {{ isMonitoring ? '运行中' : '已停止' }}
+        </text>
+      </view>
+      <view class="status-item">
+        <text class="status-label">权限状态:</text>
+        <text :class="['status-value', hasPermissions ? 'active' : 'inactive']">
+          {{ hasPermissions ? '已授权' : '未授权' }}
+        </text>
+      </view>
+    </view>
+
+    <!-- 控制按钮 -->
+    <view class="control-section">
+      <button 
+        :class="['control-btn', isMonitoring ? 'stop' : 'start']"
+        @click="toggleMonitoring"
+      >
+        {{ isMonitoring ? '停止监听' : '开始监听' }}
+      </button>
+      
+      <button 
+        class="control-btn secondary"
+        @click="requestPermissions"
+        v-if="!hasPermissions"
+      >
+        请求权限
+      </button>
+    </view>
+
+    <!-- 目标应用配置 -->
+    <view class="config-section">
+      <text class="section-title">目标应用</text>
+      <view class="app-list">
+        <view 
+          v-for="(app, index) in targetApps" 
+          :key="index"
+          class="app-item"
+        >
+          <text class="app-name">{{ app.name }}</text>
+          <text class="app-package">{{ app.package }}</text>
+          <button 
+            class="remove-btn"
+            @click="removeApp(index)"
+          >
+            删除
+          </button>
+        </view>
+        
+        <view class="add-app-section">
+          <input 
+            v-model="newAppPackage"
+            placeholder="输入应用包名"
+            class="app-input"
+          />
+          <button 
+            class="add-btn"
+            @click="addApp"
+          >
+            添加
+          </button>
+        </view>
+      </view>
+    </view>
+
+    <!-- 监听记录 -->
+    <view class="history-section">
+      <text class="section-title">监听记录</text>
+      <view class="history-list">
+        <view 
+          v-for="(record, index) in launchHistory" 
+          :key="index"
+          class="history-item"
+        >
+          <view class="history-info">
+            <text class="history-app">{{ record.appName }}</text>
+            <text class="history-time">{{ formatTime(record.launchTime) }}</text>
+          </view>
+          <text class="history-package">{{ record.packageName }}</text>
+        </view>
+        
+        <view v-if="launchHistory.length === 0" class="empty-history">
+          <text>暂无监听记录</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 设置面板 -->
+    <view class="settings-section">
+      <text class="section-title">设置</text>
+      <view class="setting-item">
+        <text class="setting-label">检查间隔 (秒)</text>
+        <input 
+          v-model="checkInterval"
+          type="number"
+          class="setting-input"
+          min="1"
+          max="60"
+        />
+      </view>
+      
+      <view class="setting-item">
+        <text class="setting-label">显示通知</text>
+        <switch 
+          v-model="showNotification"
+          @change="updateSettings"
+        />
+      </view>
+      
+      <view class="setting-item">
+        <text class="setting-label">通知标题</text>
+        <input 
+          v-model="notificationTitle"
+          class="setting-input"
+          @blur="updateSettings"
+        />
+      </view>
+      
+      <view class="setting-item">
+        <text class="setting-label">通知内容</text>
+        <textarea 
+          v-model="notificationContent"
+          class="setting-textarea"
+          @blur="updateSettings"
+        />
+      </view>
+    </view>
+  </view>
+</template>
+
+<script>
+import { createAppMonitor } from '@/uni_modules/app-monitor/utssdk/index.uts'
+
+interface AppInfo {
+  packageName: string;
+  appName: string;
+  launchTime: number;
+  pid?: number;
+}
+
+interface MonitorConfig {
+  targetApps: Array<string>;
+  checkInterval: number;
+  showNotification: boolean;
+  notificationTitle: string;
+  notificationContent: string;
+}
+
+export default {
+  data() {
+    return {
+      appMonitor: null as any,
+      isMonitoring: false,
+      hasPermissions: false,
+      targetApps: [
+        { name: '微信', package: 'com.tencent.mm' },
+        { name: 'QQ', package: 'com.tencent.mobileqq' },
+        { name: '支付宝', package: 'com.eg.android.AlipayGphone' }
+      ],
+      newAppPackage: '',
+      launchHistory: [] as AppInfo[],
+      checkInterval: 2,
+      showNotification: true,
+      notificationTitle: '检测到应用启动: {app}',
+      notificationContent: '应用 {app} 已启动\n时间: {time}'
+    }
+  },
+  
+  onLoad() {
+    this.initAppMonitor()
+    this.checkPermissions()
+  },
+  
+  onUnload() {
+    if (this.appMonitor) {
+      this.appMonitor.stopMonitoring()
+    }
+  },
+  
+  methods: {
+    initAppMonitor() {
+      const config: MonitorConfig = {
+        targetApps: this.targetApps.map(app => app.package),
+        checkInterval: this.checkInterval * 1000,
+        showNotification: this.showNotification,
+        notificationTitle: this.notificationTitle,
+        notificationContent: this.notificationContent
+      }
+      
+      this.appMonitor = createAppMonitor(config)
+      
+      // 监听应用启动事件
+      uni.$on('appLaunched', (appInfo: AppInfo) => {
+        this.launchHistory.unshift(appInfo)
+        // 只保留最近50条记录
+        if (this.launchHistory.length > 50) {
+          this.launchHistory = this.launchHistory.slice(0, 50)
+        }
+      })
+    },
+    
+    async checkPermissions() {
+      if (this.appMonitor) {
+        this.hasPermissions = this.appMonitor.checkPermissions()
+      }
+    },
+    
+    requestPermissions() {
+      if (this.appMonitor) {
+        this.appMonitor.requestPermissions()
+        // 延迟检查权限状态
+        setTimeout(() => {
+          this.checkPermissions()
+        }, 1000)
+      }
+    },
+    
+    toggleMonitoring() {
+      if (!this.appMonitor) {
+        return
+      }
+      
+      if (this.isMonitoring) {
+        this.appMonitor.stopMonitoring()
+        this.isMonitoring = false
+      } else {
+        if (!this.hasPermissions) {
+          uni.showToast({
+            title: '请先授权使用统计权限',
+            icon: 'none'
+          })
+          return
+        }
+        
+        this.appMonitor.startMonitoring()
+        this.isMonitoring = true
+      }
+    },
+    
+    addApp() {
+      if (!this.newAppPackage.trim()) {
+        uni.showToast({
+          title: '请输入应用包名',
+          icon: 'none'
+        })
+        return
+      }
+      
+      this.targetApps.push({
+        name: this.newAppPackage,
+        package: this.newAppPackage
+      })
+      
+      this.newAppPackage = ''
+      this.updateMonitorConfig()
+    },
+    
+    removeApp(index: number) {
+      this.targetApps.splice(index, 1)
+      this.updateMonitorConfig()
+    },
+    
+    updateMonitorConfig() {
+      if (this.appMonitor) {
+        const config: MonitorConfig = {
+          targetApps: this.targetApps.map(app => app.package),
+          checkInterval: this.checkInterval * 1000,
+          showNotification: this.showNotification,
+          notificationTitle: this.notificationTitle,
+          notificationContent: this.notificationContent
+        }
+        
+        this.appMonitor.updateConfig(config)
+      }
+    },
+    
+    updateSettings() {
+      this.updateMonitorConfig()
+    },
+    
+    formatTime(timestamp: number): string {
+      const date = new Date(timestamp)
+      return date.toLocaleString()
+    }
+  }
+}
+</script>
+
+<style>
+.container {
+  padding: 20rpx;
+  background-color: #f5f5f5;
+  min-height: 100vh;
+}
+
+.status-bar {
+  background: white;
+  border-radius: 16rpx;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.1);
+}
+
+.status-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.status-item:last-child {
+  margin-bottom: 0;
+}
+
+.status-label {
+  font-size: 28rpx;
+  color: #666;
+}
+
+.status-value {
+  font-size: 28rpx;
+  font-weight: bold;
+}
+
+.status-value.active {
+  color: #4CAF50;
+}
+
+.status-value.inactive {
+  color: #F44336;
+}
+
+.control-section {
+  display: flex;
+  gap: 20rpx;
+  margin-bottom: 20rpx;
+}
+
+.control-btn {
+  flex: 1;
+  height: 80rpx;
+  border-radius: 40rpx;
+  border: none;
+  font-size: 28rpx;
+  font-weight: bold;
+  color: white;
+}
+
+.control-btn.start {
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+}
+
+.control-btn.stop {
+  background: linear-gradient(135deg, #F44336, #d32f2f);
+}
+
+.control-btn.secondary {
+  background: linear-gradient(135deg, #2196F3, #1976D2);
+}
+
+.config-section,
+.history-section,
+.settings-section {
+  background: white;
+  border-radius: 16rpx;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.1);
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 20rpx;
+  display: block;
+}
+
+.app-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.app-item {
+  display: flex;
+  align-items: center;
+  padding: 20rpx;
+  background: #f8f9fa;
+  border-radius: 12rpx;
+  border: 1rpx solid #e9ecef;
+}
+
+.app-name {
+  flex: 1;
+  font-size: 28rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+.app-package {
+  flex: 2;
+  font-size: 24rpx;
+  color: #666;
+  margin: 0 20rpx;
+}
+
+.remove-btn {
+  background: #F44336;
+  color: white;
+  border: none;
+  border-radius: 8rpx;
+  padding: 10rpx 20rpx;
+  font-size: 24rpx;
+}
+
+.add-app-section {
+  display: flex;
+  gap: 20rpx;
+  align-items: center;
+}
+
+.app-input {
+  flex: 1;
+  height: 60rpx;
+  border: 1rpx solid #ddd;
+  border-radius: 8rpx;
+  padding: 0 20rpx;
+  font-size: 28rpx;
+}
+
+.add-btn {
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 8rpx;
+  padding: 15rpx 30rpx;
+  font-size: 28rpx;
+}
+
+.history-list {
+  max-height: 400rpx;
+  overflow-y: auto;
+}
+
+.history-item {
+  padding: 20rpx;
+  border-bottom: 1rpx solid #eee;
+}
+
+.history-item:last-child {
+  border-bottom: none;
+}
+
+.history-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10rpx;
+}
+
+.history-app {
+  font-size: 28rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+.history-time {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.history-package {
+  font-size: 24rpx;
+  color: #666;
+}
+
+.empty-history {
+  text-align: center;
+  padding: 60rpx 0;
+  color: #999;
+  font-size: 28rpx;
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #eee;
+}
+
+.setting-item:last-child {
+  border-bottom: none;
+}
+
+.setting-label {
+  font-size: 28rpx;
+  color: #333;
+}
+
+.setting-input {
+  width: 200rpx;
+  height: 60rpx;
+  border: 1rpx solid #ddd;
+  border-radius: 8rpx;
+  padding: 0 20rpx;
+  font-size: 28rpx;
+  text-align: center;
+}
+
+.setting-textarea {
+  width: 400rpx;
+  height: 120rpx;
+  border: 1rpx solid #ddd;
+  border-radius: 8rpx;
+  padding: 20rpx;
+  font-size: 28rpx;
+}
+</style>

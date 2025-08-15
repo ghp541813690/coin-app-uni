@@ -1,0 +1,406 @@
+/**
+ * 应用监听器 UTS 模块
+ * 支持 Android 和 iOS 平台
+ */
+
+import { UTSAndroid } from "io.dcloud.uts";
+
+// Android 相关导入
+// #ifdef APP-ANDROID
+import android.app.ActivityManager;
+import android.app.usage.UsageEvents;
+import android.app.usage.UsageStatsManager;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
+import android.provider.Settings;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.IntentFilter;
+import android.content.BroadcastReceiver;
+import android.os.Handler;
+import android.os.Looper;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+// #endif
+
+// iOS 相关导入
+// #ifdef APP-IOS
+import Foundation;
+import UIKit;
+// #endif
+
+/**
+ * 应用信息接口
+ */
+interface AppInfo {
+    packageName: string;
+    appName: string;
+    launchTime: number;
+    pid?: number;
+}
+
+/**
+ * 监听器配置
+ */
+interface MonitorConfig {
+    targetApps: Array<string>; // 目标应用包名列表
+    checkInterval: number; // 检查间隔（毫秒）
+    showNotification: boolean; // 是否显示通知
+    notificationTitle: string; // 通知标题
+    notificationContent: string; // 通知内容模板
+}
+
+/**
+ * 应用监听器类
+ */
+export class AppMonitor {
+    private config: MonitorConfig;
+    private isMonitoring: boolean = false;
+    private lastCheckTime: number = 0;
+    private launchedApps: Map<string, number> = new Map();
+    
+    // Android 相关属性
+    // #ifdef APP-ANDROID
+    private context: Context;
+    private usageStatsManager: UsageStatsManager;
+    private notificationManager: NotificationManager;
+    private handler: Handler;
+    private checkRunnable: Runnable;
+    // #endif
+    
+    // iOS 相关属性
+    // #ifdef APP-IOS
+    private timer: Timer?;
+    // #endif
+
+    constructor(config: MonitorConfig) {
+        this.config = config;
+        
+        // #ifdef APP-ANDROID
+        this.context = UTSAndroid.getUniActivity();
+        this.usageStatsManager = this.context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager;
+        this.notificationManager = this.context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager;
+        this.handler = new Handler(Looper.getMainLooper());
+        this.checkRunnable = new Runnable({
+            run: () => {
+                this.checkAndroidApps();
+            }
+        });
+        this.createNotificationChannel();
+        // #endif
+        
+        // #ifdef APP-IOS
+        // iOS 初始化
+        // #endif
+    }
+
+    /**
+     * 开始监听
+     */
+    public startMonitoring(): void {
+        if (this.isMonitoring) {
+            console.log("应用监听器已在运行中");
+            return;
+        }
+        
+        this.isMonitoring = true;
+        this.lastCheckTime = Date.now();
+        
+        // #ifdef APP-ANDROID
+        this.startAndroidMonitoring();
+        // #endif
+        
+        // #ifdef APP-IOS
+        this.startIOSMonitoring();
+        // #endif
+        
+        console.log("应用监听器已启动");
+    }
+
+    /**
+     * 停止监听
+     */
+    public stopMonitoring(): void {
+        if (!this.isMonitoring) {
+            console.log("应用监听器未在运行");
+            return;
+        }
+        
+        this.isMonitoring = false;
+        
+        // #ifdef APP-ANDROID
+        this.stopAndroidMonitoring();
+        // #endif
+        
+        // #ifdef APP-IOS
+        this.stopIOSMonitoring();
+        // #endif
+        
+        console.log("应用监听器已停止");
+    }
+
+    /**
+     * 更新配置
+     */
+    public updateConfig(newConfig: MonitorConfig): void {
+        this.config = newConfig;
+        console.log("应用监听器配置已更新");
+    }
+
+    /**
+     * 检查权限
+     */
+    public checkPermissions(): boolean {
+        // #ifdef APP-ANDROID
+        return this.checkAndroidPermissions();
+        // #endif
+        
+        // #ifdef APP-IOS
+        return this.checkIOSPermissions();
+        // #endif
+        
+        return false;
+    }
+
+    /**
+     * 请求权限
+     */
+    public requestPermissions(): void {
+        // #ifdef APP-ANDROID
+        this.requestAndroidPermissions();
+        // #endif
+        
+        // #ifdef APP-IOS
+        this.requestIOSPermissions();
+        // #endif
+    }
+
+    // #ifdef APP-ANDROID
+    /**
+     * Android 平台相关方法
+     */
+    private startAndroidMonitoring(): void {
+        this.handler.postDelayed(this.checkRunnable, this.config.checkInterval);
+    }
+
+    private stopAndroidMonitoring(): void {
+        this.handler.removeCallbacks(this.checkRunnable);
+    }
+
+    private checkAndroidApps(): void {
+        if (!this.isMonitoring) {
+            return;
+        }
+
+        try {
+            const currentTime = Date.now();
+            const endTime = currentTime;
+            const startTime = this.lastCheckTime;
+
+            // 获取使用统计事件
+            const usageEvents = this.usageStatsManager.queryEvents(startTime, endTime);
+            const event = new UsageEvents.Event();
+
+            while (usageEvents.hasNextEvent()) {
+                usageEvents.getNextEvent(event);
+                
+                if (event.getEventType() == UsageEvents.Event.MOVE_TO_FOREGROUND) {
+                    const packageName = event.getPackageName();
+                    
+                    if (this.isTargetApp(packageName)) {
+                        const appInfo = this.getAppInfo(packageName);
+                        if (appInfo) {
+                            this.onAppLaunched(appInfo);
+                        }
+                    }
+                }
+            }
+
+            this.lastCheckTime = currentTime;
+            
+            // 继续下一次检查
+            this.handler.postDelayed(this.checkRunnable, this.config.checkInterval);
+            
+        } catch (error) {
+            console.error("检查应用启动失败:", error);
+            // 出错后继续监听
+            this.handler.postDelayed(this.checkRunnable, this.config.checkInterval);
+        }
+    }
+
+    private isTargetApp(packageName: string): boolean {
+        return this.config.targetApps.includes(packageName);
+    }
+
+    private getAppInfo(packageName: string): AppInfo | null {
+        try {
+            const packageManager = this.context.getPackageManager();
+            const packageInfo = packageManager.getPackageInfo(packageName, 0);
+            const appName = packageInfo.applicationInfo.loadLabel(packageManager).toString();
+            
+            return {
+                packageName: packageName,
+                appName: appName,
+                launchTime: Date.now()
+            };
+        } catch (error) {
+            console.error("获取应用信息失败:", error);
+            return null;
+        }
+    }
+
+    private checkAndroidPermissions(): boolean {
+        // 检查使用统计权限
+        const appOps = this.context.getSystemService(Context.APP_OPS_SERVICE);
+        const mode = appOps.checkOpNoThrow("android:get_usage_stats", 
+            android.os.Process.myUid(), this.context.getPackageName());
+        
+        return mode == android.app.AppOpsManager.MODE_ALLOWED;
+    }
+
+    private requestAndroidPermissions(): void {
+        // 跳转到使用统计权限设置页面
+        const intent = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        this.context.startActivity(intent);
+    }
+
+    private createNotificationChannel(): void {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            const channel = new NotificationChannel(
+                "app_monitor",
+                "应用监听器",
+                NotificationManager.IMPORTANCE_DEFAULT
+            );
+            channel.setDescription("应用启动通知");
+            this.notificationManager.createNotificationChannel(channel);
+        }
+    }
+
+    private showNotification(appInfo: AppInfo): void {
+        if (!this.config.showNotification) {
+            return;
+        }
+
+        const content = this.config.notificationContent
+            .replace("{app}", appInfo.appName)
+            .replace("{package}", appInfo.packageName)
+            .replace("{time}", new Date(appInfo.launchTime).toLocaleString());
+
+        const builder = new Notification.Builder(this.context, "app_monitor")
+            .setContentTitle(this.config.notificationTitle)
+            .setContentText(content)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setAutoCancel(true);
+
+        this.notificationManager.notify(appInfo.packageName.hashCode(), builder.build());
+    }
+    // #endif
+
+    // #ifdef APP-IOS
+    /**
+     * iOS 平台相关方法
+     */
+    private startIOSMonitoring(): void {
+        this.timer = Timer.scheduledTimerWithTimeInterval(
+            this.config.checkInterval / 1000.0,
+            true,
+            () => {
+                this.checkIOSApps();
+            }
+        );
+    }
+
+    private stopIOSMonitoring(): void {
+        if (this.timer) {
+            this.timer.invalidate();
+            this.timer = null;
+        }
+    }
+
+    private checkIOSApps(): void {
+        if (!this.isMonitoring) {
+            return;
+        }
+
+        // iOS 平台限制较多，主要通过系统通知或其他方式检测
+        // 这里提供一个基础框架，实际实现可能需要根据具体需求调整
+        console.log("iOS 应用检查 - 当前时间:", Date.now());
+    }
+
+    private checkIOSPermissions(): boolean {
+        // iOS 权限检查
+        return true; // 简化处理
+    }
+
+    private requestIOSPermissions(): void {
+        // iOS 权限请求
+        console.log("请求 iOS 权限");
+    }
+    // #endif
+
+    /**
+     * 应用启动回调
+     */
+    private onAppLaunched(appInfo: AppInfo): void {
+        // 防重复触发
+        const key = appInfo.packageName;
+        const now = Date.now();
+        const lastTime = this.launchedApps.get(key) || 0;
+        
+        if (now - lastTime < 5000) { // 5秒内不重复触发
+            return;
+        }
+        
+        this.launchedApps.set(key, now);
+        
+        console.log("检测到应用启动:", appInfo);
+        
+        // 显示通知
+        // #ifdef APP-ANDROID
+        this.showNotification(appInfo);
+        // #endif
+        
+        // 触发自定义事件
+        uni.$emit('appLaunched', appInfo);
+    }
+
+    /**
+     * 获取当前运行的应用列表
+     */
+    public getRunningApps(): Array<AppInfo> {
+        const apps: Array<AppInfo> = [];
+        
+        // #ifdef APP-ANDROID
+        const activityManager = this.context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager;
+        const runningTasks = activityManager.getRunningTasks(10);
+        
+        for (let i = 0; i < runningTasks.size(); i++) {
+            const task = runningTasks.get(i);
+            const topActivity = task.getTopActivity();
+            if (topActivity) {
+                const packageName = topActivity.getPackageName();
+                const appInfo = this.getAppInfo(packageName);
+                if (appInfo) {
+                    apps.push(appInfo);
+                }
+            }
+        }
+        // #endif
+        
+        return apps;
+    }
+}
+
+/**
+ * 创建应用监听器实例
+ */
+export function createAppMonitor(config: MonitorConfig): AppMonitor {
+    return new AppMonitor(config);
+}

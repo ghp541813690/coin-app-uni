@@ -1,0 +1,87 @@
+{
+  "id": "app-monitor",
+  "displayName": "应用监听器",
+  "version": "1.0.0",
+  "description": "监听指定应用的启动事件，支持 Android 和 iOS 平台",
+  "keywords": [
+    "app",
+    "monitor",
+    "launch",
+    "detection",
+    "android",
+    "ios"
+  ],
+  "repository": "",
+  "engines": {
+    "HBuilderX": "^4.0.0"
+  },
+  "dcloudext": {
+    "type": "uts",
+    "sale": {
+      "regular": {
+        "price": "0.00"
+      },
+      "sourcecode": {
+        "price": "0.00"
+      }
+    },
+    "contact": {
+      "qq": ""
+    },
+    "declaration": {
+      "ads": "无",
+      "data": "无",
+      "permissions": "需要应用使用统计权限"
+    },
+    "npmurl": ""
+  },
+  "uni_modules": {
+    "dependencies": [],
+    "encrypt": [],
+    "platforms": {
+      "cloud": {
+        "tcb": "y",
+        "aliyun": "y"
+      },
+      "client": {
+        "App": {
+          "app-vue": "n",
+          "app-nvue": "n",
+          "app-uvue": "y"
+        },
+        "H5-mobile": {
+          "Safari": "n",
+          "Android Browser": "n",
+          "微信浏览器(Android)": "n",
+          "QQ浏览器(Android)": "n"
+        },
+        "H5-pc": {
+          "Chrome": "n",
+          "IE": "n",
+          "Edge": "n",
+          "Firefox": "n",
+          "Safari": "n"
+        },
+        "小程序": {
+          "微信": "n",
+          "阿里": "n",
+          "百度": "n",
+          "字节跳动": "n",
+          "QQ": "n",
+          "钉钉": "n",
+          "快手": "n",
+          "飞书": "n",
+          "京东": "n"
+        },
+        "快应用": {
+          "华为": "n",
+          "联盟": "n"
+        },
+        "Vue": {
+          "vue2": "n",
+          "vue3": "n"
+        }
+      }
+    }
+  }
+}

@@ -1,36 +1,238 @@
 <template>
-	<web-view
-	  src="http://situai.cn:8101" 
-	  :webview-styles="{ userAgent: 'Mozilla/5.0 ...' }"
-	></web-view>
+  <view class="container">
+    <!-- 头部 -->
+    <view class="header">
+      <text class="header-title">应用监听器</text>
+      <text class="header-subtitle">监控指定应用的启动事件</text>
+    </view>
+
+    <!-- 功能卡片 -->
+    <view class="card-container">
+      <view class="feature-card" @click="navigateToMonitor">
+        <view class="card-icon">
+          <text class="icon">📱</text>
+        </view>
+        <view class="card-content">
+          <text class="card-title">应用监听</text>
+          <text class="card-desc">监听指定应用的启动，实时通知</text>
+        </view>
+        <view class="card-arrow">
+          <text class="arrow">→</text>
+        </view>
+      </view>
+
+      <view class="feature-card" @click="navigateToWeb">
+        <view class="card-icon">
+          <text class="icon">🌐</text>
+        </view>
+        <view class="card-content">
+          <text class="card-title">Web 应用</text>
+          <text class="card-desc">打开原有的 Web 应用</text>
+        </view>
+        <view class="card-arrow">
+          <text class="arrow">→</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 状态信息 -->
+    <view class="status-section">
+      <view class="status-card">
+        <text class="status-title">平台信息</text>
+        <view class="status-item">
+          <text class="status-label">平台:</text>
+          <text class="status-value">{{ platform }}</text>
+        </view>
+        <view class="status-item">
+          <text class="status-label">版本:</text>
+          <text class="status-value">{{ version }}</text>
+        </view>
+      </view>
+    </view>
+  </view>
 </template>
 
 <script>
-	export default {
-		data() {
-			return {
-				title: 'Hello'
-			}
-		},
-		onLoad() {
-
-		},
-		methods: {
-
-		}
-	}
+export default {
+  data() {
+    return {
+      platform: '',
+      version: ''
+    }
+  },
+  
+  onLoad() {
+    this.getPlatformInfo()
+  },
+  
+  methods: {
+    navigateToMonitor() {
+      uni.navigateTo({
+        url: '/pages/app-monitor/index'
+      })
+    },
+    
+    navigateToWeb() {
+      // 跳转到原有的 Web 应用
+      uni.navigateTo({
+        url: '/pages/web-view/index'
+      })
+    },
+    
+    getPlatformInfo() {
+      // #ifdef APP-ANDROID
+      this.platform = 'Android'
+      // #endif
+      
+      // #ifdef APP-IOS
+      this.platform = 'iOS'
+      // #endif
+      
+      // #ifdef H5
+      this.platform = 'H5'
+      // #endif
+      
+      // 获取应用版本信息
+      const systemInfo = uni.getSystemInfoSync()
+      this.version = systemInfo.version || '1.0.0'
+    }
+  }
+}
 </script>
 
 <style>
-	.logo {
-		height: 100px;
-		width: 100px;
-		margin: 100px auto 25px auto;
-	}
+.container {
+  padding: 40rpx;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+}
 
-	.title {
-		font-size: 18px;
-		color: #8f8f94;
-    text-align: center;
-	}
+.header {
+  text-align: center;
+  margin-bottom: 60rpx;
+  padding-top: 60rpx;
+}
+
+.header-title {
+  font-size: 48rpx;
+  font-weight: bold;
+  color: white;
+  display: block;
+  margin-bottom: 20rpx;
+}
+
+.header-subtitle {
+  font-size: 28rpx;
+  color: rgba(255, 255, 255, 0.8);
+  display: block;
+}
+
+.card-container {
+  margin-bottom: 60rpx;
+}
+
+.feature-card {
+  background: white;
+  border-radius: 20rpx;
+  padding: 40rpx;
+  margin-bottom: 30rpx;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 8rpx 25rpx rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+}
+
+.feature-card:active {
+  transform: scale(0.98);
+}
+
+.card-icon {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 20rpx;
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-right: 30rpx;
+}
+
+.icon {
+  font-size: 40rpx;
+}
+
+.card-content {
+  flex: 1;
+}
+
+.card-title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333;
+  display: block;
+  margin-bottom: 10rpx;
+}
+
+.card-desc {
+  font-size: 26rpx;
+  color: #666;
+  display: block;
+}
+
+.card-arrow {
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 30rpx;
+  background: #f5f5f5;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.arrow {
+  font-size: 32rpx;
+  color: #999;
+  font-weight: bold;
+}
+
+.status-section {
+  margin-top: auto;
+}
+
+.status-card {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20rpx;
+  padding: 30rpx;
+  backdrop-filter: blur(10rpx);
+}
+
+.status-title {
+  font-size: 28rpx;
+  color: white;
+  font-weight: bold;
+  display: block;
+  margin-bottom: 20rpx;
+}
+
+.status-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15rpx;
+}
+
+.status-item:last-child {
+  margin-bottom: 0;
+}
+
+.status-label {
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.status-value {
+  font-size: 26rpx;
+  color: white;
+  font-weight: bold;
+}
 </style>

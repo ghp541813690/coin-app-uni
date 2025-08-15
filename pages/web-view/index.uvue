@@ -1,0 +1,32 @@
+<template>
+  <view class="container">
+    <web-view
+      src="http://situai.cn:8101" 
+      :webview-styles="{ userAgent: 'Mozilla/5.0 ...' }"
+    ></web-view>
+  </view>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      title: 'Web 应用'
+    }
+  },
+  
+  onLoad() {
+    // 设置导航栏标题
+    uni.setNavigationBarTitle({
+      title: 'Web 应用'
+    })
+  }
+}
+</script>
+
+<style>
+.container {
+  width: 100%;
+  height: 100vh;
+}
+</style>
