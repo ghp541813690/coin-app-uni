@@ -52,14 +52,24 @@
       "splashScreens": {
         "default": {}
       }
-    }
+    },
+    "permissions": [
+      "android.permission.QUERY_ALL_PACKAGES",
+      "android.permission.PACKAGE_USAGE_STATS",
+      "android.permission.SYSTEM_ALERT_WINDOW",
+      "android.permission.FOREGROUND_SERVICE",
+      "android.permission.POST_NOTIFICATIONS"
+    ]
   },
   "app-ios": {
     "distribute": {
       "modules": {},
       "icons": {},
       "splashScreens": {}
-    }
+    },
+    "permissions": [
+      "NSUserActivityUsageDescription"
+    ]
   },
   "app-plus": {
 	  "ssl": {

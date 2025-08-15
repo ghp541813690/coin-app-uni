@@ -12,6 +12,22 @@
 			{
 				"navigationBarTitleText" : ""
 			}
+		},
+		{
+			"path": "pages/app-monitor/index",
+			"style": {
+				"navigationBarTitleText": "应用监听器",
+				"navigationBarBackgroundColor": "#4CAF50",
+				"navigationBarTextStyle": "white"
+			}
+		},
+		{
+			"path": "pages/web-view/index",
+			"style": {
+				"navigationBarTitleText": "Web 应用",
+				"navigationBarBackgroundColor": "#2196F3",
+				"navigationBarTextStyle": "white"
+			}
 		}
 	],
 	"globalStyle": {
