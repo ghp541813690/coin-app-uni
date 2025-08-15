@@ -1,0 +1,756 @@
+<template>
+  <view v-if="visible" class="popup-overlay" @click="handleOverlayClick">
+    <view class="popup-container" :style="containerStyle" @click.stop>
+      <!-- 标题栏 -->
+      <view class="popup-header" v-if="showHeader">
+        <text class="popup-title">{{ title }}</text>
+        <view class="header-actions">
+          <button 
+            v-if="showMinimize"
+            class="header-btn minimize-btn"
+            @click="minimize"
+          >
+            <text class="btn-icon">─</text>
+          </button>
+          <button 
+            v-if="showMaximize"
+            class="header-btn maximize-btn"
+            @click="toggleMaximize"
+          >
+            <text class="btn-icon">{{ isMaximized ? '❐' : '⬜' }}</text>
+          </button>
+          <button 
+            class="header-btn close-btn"
+            @click="close"
+          >
+            <text class="btn-icon">×</text>
+          </button>
+        </view>
+      </view>
+
+      <!-- 内容区域 -->
+      <view class="popup-content" :style="contentStyle">
+        <!-- H5 WebView 内容 -->
+        <web-view
+          v-if="contentType === 'h5' && h5Url"
+          :src="h5Url"
+          :webview-styles="webviewStyles"
+          @message="handleWebViewMessage"
+          @error="handleWebViewError"
+        ></web-view>
+
+        <!-- 自定义 HTML 内容 -->
+        <web-view
+          v-else-if="contentType === 'html' && htmlContent"
+          :src="htmlDataUrl"
+          :webview-styles="webviewStyles"
+          @message="handleWebViewMessage"
+          @error="handleWebViewError"
+        ></web-view>
+
+        <!-- uniapp 页面内容 -->
+        <view v-else-if="contentType === 'uniapp' && uniappPage" class="uniapp-content">
+          <component :is="uniappPage" :app-info="appInfo"></component>
+        </view>
+
+        <!-- 自定义组件内容 -->
+        <view v-else-if="contentType === 'component' && customComponent" class="custom-component">
+          <component :is="customComponent" :app-info="appInfo"></component>
+        </view>
+
+        <!-- 默认内容 -->
+        <view v-else class="default-content">
+          <text class="default-text">{{ defaultContent }}</text>
+        </view>
+      </view>
+
+      <!-- 底部操作栏 -->
+      <view class="popup-footer" v-if="showFooter">
+        <view class="footer-actions">
+          <button 
+            v-for="(action, index) in footerActions"
+            :key="index"
+            :class="['footer-btn', action.type]"
+            @click="handleFooterAction(action)"
+          >
+            {{ action.text }}
+          </button>
+        </view>
+      </view>
+
+      <!-- 拖拽手柄 -->
+      <view 
+        v-if="draggable && !isMaximized"
+        class="drag-handle"
+        @touchstart="startDrag"
+        @touchmove="onDrag"
+        @touchend="endDrag"
+      ></view>
+
+      <!-- 调整大小手柄 -->
+      <view 
+        v-if="resizable && !isMaximized"
+        class="resize-handle"
+        @touchstart="startResize"
+        @touchmove="onResize"
+        @touchend="endResize"
+      ></view>
+    </view>
+  </view>
+</template>
+
+<script>
+interface AppInfo {
+  packageName: string;
+  appName: string;
+  launchTime: number;
+  pid?: number;
+}
+
+interface FooterAction {
+  text: string;
+  type: 'primary' | 'secondary' | 'danger';
+  action: string;
+  data?: any;
+}
+
+interface PopupConfig {
+  title?: string;
+  contentType: 'h5' | 'html' | 'uniapp' | 'component' | 'default';
+  h5Url?: string;
+  htmlContent?: string;
+  uniappPage?: any;
+  customComponent?: any;
+  defaultContent?: string;
+  width?: number;
+  height?: number;
+  x?: number;
+  y?: number;
+  draggable?: boolean;
+  resizable?: boolean;
+  showHeader?: boolean;
+  showFooter?: boolean;
+  showMinimize?: boolean;
+  showMaximize?: boolean;
+  footerActions?: FooterAction[];
+  webviewStyles?: any;
+  autoClose?: boolean;
+  autoCloseDelay?: number;
+}
+
+export default {
+  name: 'H5PopupWindow',
+  props: {
+    visible: {
+      type: Boolean,
+      default: false
+    },
+    appInfo: {
+      type: Object as () => AppInfo,
+      default: () => ({
+        packageName: '',
+        appName: '',
+        launchTime: 0
+      })
+    },
+    config: {
+      type: Object as () => PopupConfig,
+      default: () => ({})
+    }
+  },
+
+  data() {
+    return {
+      isMaximized: false,
+      isMinimized: false,
+      isDragging: false,
+      isResizing: false,
+      dragStartX: 0,
+      dragStartY: 0,
+      resizeStartX: 0,
+      resizeStartY: 0,
+      currentX: 0,
+      currentY: 0,
+      currentWidth: 600,
+      currentHeight: 400,
+      htmlDataUrl: '',
+      autoCloseTimer: null as any
+    }
+  },
+
+  computed: {
+    title(): string {
+      return this.config.title || `检测到应用: ${this.appInfo.appName}`
+    },
+
+    contentType(): string {
+      return this.config.contentType || 'default'
+    },
+
+    h5Url(): string {
+      return this.config.h5Url || ''
+    },
+
+    htmlContent(): string {
+      return this.config.htmlContent || ''
+    },
+
+    uniappPage(): any {
+      return this.config.uniappPage || null
+    },
+
+    customComponent(): any {
+      return this.config.customComponent || null
+    },
+
+    defaultContent(): string {
+      return this.config.defaultContent || `应用 ${this.appInfo.appName} 已启动！`
+    },
+
+    showHeader(): boolean {
+      return this.config.showHeader !== false
+    },
+
+    showFooter(): boolean {
+      return this.config.showFooter !== false
+    },
+
+    showMinimize(): boolean {
+      return this.config.showMinimize !== false
+    },
+
+    showMaximize(): boolean {
+      return this.config.showMaximize !== false
+    },
+
+    draggable(): boolean {
+      return this.config.draggable !== false
+    },
+
+    resizable(): boolean {
+      return this.config.resizable !== false
+    },
+
+    footerActions(): FooterAction[] {
+      return this.config.footerActions || [
+        {
+          text: '确定',
+          type: 'primary',
+          action: 'confirm'
+        },
+        {
+          text: '取消',
+          type: 'secondary',
+          action: 'cancel'
+        }
+      ]
+    },
+
+    webviewStyles(): any {
+      return this.config.webviewStyles || {
+        progress: {
+          color: '#4CAF50'
+        }
+      }
+    },
+
+    containerStyle(): any {
+      const style: any = {}
+      
+      if (!this.isMaximized) {
+        style.width = `${this.currentWidth}rpx`
+        style.height = `${this.currentHeight}rpx`
+        style.left = `${this.currentX}rpx`
+        style.top = `${this.currentY}rpx`
+      } else {
+        style.width = '100%'
+        style.height = '100%'
+        style.left = '0'
+        style.top = '0'
+      }
+
+      if (this.isMinimized) {
+        style.transform = 'scale(0.1)'
+        style.opacity = '0'
+      }
+
+      return style
+    },
+
+    contentStyle(): any {
+      const style: any = {}
+      
+      if (this.showHeader) {
+        style.height = 'calc(100% - 100rpx)'
+      }
+      
+      if (this.showFooter) {
+        style.height = 'calc(100% - 200rpx)'
+      }
+
+      return style
+    }
+  },
+
+  watch: {
+    visible(newVal: boolean) {
+      if (newVal) {
+        this.initPopup()
+        this.startAutoClose()
+      } else {
+        this.stopAutoClose()
+      }
+    },
+
+    htmlContent: {
+      handler(newContent: string) {
+        if (newContent && this.contentType === 'html') {
+          this.generateHtmlDataUrl()
+        }
+      },
+      immediate: true
+    }
+  },
+
+  methods: {
+    initPopup() {
+      // 初始化位置和大小
+      this.currentWidth = this.config.width || 600
+      this.currentHeight = this.config.height || 400
+      this.currentX = this.config.x || 50
+      this.currentY = this.config.y || 100
+      this.isMaximized = false
+      this.isMinimized = false
+
+      // 生成 HTML 数据 URL
+      if (this.contentType === 'html' && this.htmlContent) {
+        this.generateHtmlDataUrl()
+      }
+    },
+
+    generateHtmlDataUrl() {
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>${this.title}</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 20px;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              background: #f5f5f5;
+            }
+            .container {
+              background: white;
+              border-radius: 12px;
+              padding: 20px;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            }
+            .app-info {
+              display: flex;
+              align-items: center;
+              margin-bottom: 20px;
+              padding: 15px;
+              background: #f8f9fa;
+              border-radius: 8px;
+            }
+            .app-icon {
+              width: 48px;
+              height: 48px;
+              background: #4CAF50;
+              border-radius: 8px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: white;
+              font-weight: bold;
+              margin-right: 15px;
+            }
+            .app-details h3 {
+              margin: 0 0 5px 0;
+              color: #333;
+            }
+            .app-details p {
+              margin: 0;
+              color: #666;
+              font-size: 14px;
+            }
+            .content {
+              line-height: 1.6;
+              color: #333;
+            }
+            .actions {
+              margin-top: 20px;
+              display: flex;
+              gap: 10px;
+            }
+            .btn {
+              padding: 10px 20px;
+              border: none;
+              border-radius: 6px;
+              cursor: pointer;
+              font-size: 14px;
+              font-weight: 500;
+            }
+            .btn-primary {
+              background: #4CAF50;
+              color: white;
+            }
+            .btn-secondary {
+              background: #f5f5f5;
+              color: #666;
+              border: 1px solid #ddd;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="app-info">
+              <div class="app-icon">${this.appInfo.appName.charAt(0)}</div>
+              <div class="app-details">
+                <h3>${this.appInfo.appName}</h3>
+                <p>${this.appInfo.packageName}</p>
+              </div>
+            </div>
+            <div class="content">
+              ${this.htmlContent}
+            </div>
+            <div class="actions">
+              <button class="btn btn-primary" onclick="window.parent.postMessage({action: 'confirm'}, '*')">确定</button>
+              <button class="btn btn-secondary" onclick="window.parent.postMessage({action: 'cancel'}, '*')">取消</button>
+            </div>
+          </div>
+          <script>
+            // 自定义 JavaScript 代码
+            console.log('应用启动弹窗已加载');
+            
+            // 可以在这里添加自定义的 JavaScript 逻辑
+            document.addEventListener('DOMContentLoaded', function() {
+              // 页面加载完成后的逻辑
+            });
+          </script>
+        </body>
+        </html>
+      `
+
+      this.htmlDataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`
+    },
+
+    handleOverlayClick() {
+      if (this.config.closeOnOverlayClick !== false) {
+        this.close()
+      }
+    },
+
+    close() {
+      this.stopAutoClose()
+      this.$emit('close')
+    },
+
+    minimize() {
+      this.isMinimized = true
+      this.$emit('minimize')
+    },
+
+    toggleMaximize() {
+      this.isMaximized = !this.isMaximized
+      this.$emit('maximize', this.isMaximized)
+    },
+
+    handleFooterAction(action: FooterAction) {
+      this.$emit('action', {
+        action: action.action,
+        data: action.data,
+        appInfo: this.appInfo
+      })
+
+      if (action.action === 'confirm' || action.action === 'cancel') {
+        this.close()
+      }
+    },
+
+    handleWebViewMessage(event: any) {
+      const { data } = event.detail
+      if (data && data.action) {
+        this.handleFooterAction({
+          text: data.action,
+          type: 'primary',
+          action: data.action,
+          data: data.data
+        })
+      }
+    },
+
+    handleWebViewError(error: any) {
+      console.error('WebView 加载错误:', error)
+      this.$emit('error', error)
+    },
+
+    startDrag(event: any) {
+      if (!this.draggable || this.isMaximized) return
+      
+      this.isDragging = true
+      const touch = event.touches[0]
+      this.dragStartX = touch.clientX - this.currentX
+      this.dragStartY = touch.clientY - this.currentY
+    },
+
+    onDrag(event: any) {
+      if (!this.isDragging) return
+      
+      const touch = event.touches[0]
+      this.currentX = touch.clientX - this.dragStartX
+      this.currentY = touch.clientY - this.dragStartY
+      
+      // 限制在屏幕范围内
+      this.currentX = Math.max(0, Math.min(this.currentX, 750 - this.currentWidth))
+      this.currentY = Math.max(0, Math.min(this.currentY, 1334 - this.currentHeight))
+    },
+
+    endDrag() {
+      this.isDragging = false
+    },
+
+    startResize(event: any) {
+      if (!this.resizable || this.isMaximized) return
+      
+      this.isResizing = true
+      const touch = event.touches[0]
+      this.resizeStartX = touch.clientX - this.currentWidth
+      this.resizeStartY = touch.clientY - this.currentHeight
+    },
+
+    onResize(event: any) {
+      if (!this.isResizing) return
+      
+      const touch = event.touches[0]
+      this.currentWidth = Math.max(300, Math.min(750, touch.clientX - this.resizeStartX))
+      this.currentHeight = Math.max(200, Math.min(1334, touch.clientY - this.resizeStartY))
+    },
+
+    endResize() {
+      this.isResizing = false
+    },
+
+    startAutoClose() {
+      if (this.config.autoClose && this.config.autoCloseDelay) {
+        this.autoCloseTimer = setTimeout(() => {
+          this.close()
+        }, this.config.autoCloseDelay)
+      }
+    },
+
+    stopAutoClose() {
+      if (this.autoCloseTimer) {
+        clearTimeout(this.autoCloseTimer)
+        this.autoCloseTimer = null
+      }
+    }
+  },
+
+  beforeDestroy() {
+    this.stopAutoClose()
+  }
+}
+</script>
+
+<style>
+.popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.popup-container {
+  position: absolute;
+  background: white;
+  border-radius: 16rpx;
+  box-shadow: 0 20rpx 60rpx rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  min-width: 300rpx;
+  min-height: 200rpx;
+}
+
+.popup-header {
+  height: 100rpx;
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 30rpx;
+  color: white;
+}
+
+.popup-title {
+  font-size: 32rpx;
+  font-weight: bold;
+  flex: 1;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10rpx;
+}
+
+.header-btn {
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 30rpx;
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.header-btn:active {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.close-btn:active {
+  background: rgba(244, 67, 54, 0.8);
+}
+
+.btn-icon {
+  font-size: 28rpx;
+  color: white;
+  font-weight: bold;
+}
+
+.popup-content {
+  width: 100%;
+  overflow: hidden;
+}
+
+.uniapp-content,
+.custom-component {
+  width: 100%;
+  height: 100%;
+}
+
+.default-content {
+  padding: 40rpx;
+  text-align: center;
+}
+
+.default-text {
+  font-size: 28rpx;
+  color: #333;
+  line-height: 1.6;
+}
+
+.popup-footer {
+  height: 100rpx;
+  background: #f8f9fa;
+  border-top: 1rpx solid #e9ecef;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0 30rpx;
+}
+
+.footer-actions {
+  display: flex;
+  gap: 20rpx;
+}
+
+.footer-btn {
+  padding: 15rpx 30rpx;
+  border-radius: 8rpx;
+  border: none;
+  font-size: 28rpx;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.footer-btn.primary {
+  background: #4CAF50;
+  color: white;
+}
+
+.footer-btn.primary:active {
+  background: #45a049;
+}
+
+.footer-btn.secondary {
+  background: #f5f5f5;
+  color: #666;
+  border: 1rpx solid #ddd;
+}
+
+.footer-btn.secondary:active {
+  background: #e9ecef;
+}
+
+.footer-btn.danger {
+  background: #F44336;
+  color: white;
+}
+
+.footer-btn.danger:active {
+  background: #d32f2f;
+}
+
+.drag-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100rpx;
+  cursor: move;
+  z-index: 1;
+}
+
+.resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 30rpx;
+  height: 30rpx;
+  cursor: se-resize;
+  background: linear-gradient(-45deg, transparent 30%, #ccc 30%, #ccc 40%, transparent 40%);
+  z-index: 1;
+}
+
+/* 动画效果 */
+.popup-container {
+  animation: popupSlideIn 0.3s ease-out;
+}
+
+@keyframes popupSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(50rpx) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 最小化动画 */
+.popup-container.minimized {
+  animation: minimize 0.3s ease-in;
+}
+
+@keyframes minimize {
+  to {
+    transform: scale(0.1);
+    opacity: 0;
+  }
+}
+</style>

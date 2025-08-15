@@ -91,9 +91,105 @@
       </view>
     </view>
 
+    <!-- 弹窗配置 -->
+    <view class="popup-config-section">
+      <text class="section-title">弹窗配置</text>
+      
+      <view class="setting-item">
+        <text class="setting-label">启用 H5 弹窗</text>
+        <switch 
+          v-model="enableH5Popup"
+          @change="updateSettings"
+        />
+      </view>
+      
+      <view class="setting-item">
+        <text class="setting-label">弹窗类型</text>
+        <picker 
+          :value="popupTypeIndex"
+          :range="popupTypes"
+          @change="onPopupTypeChange"
+        >
+          <view class="picker-value">{{ popupTypes[popupTypeIndex] }}</view>
+        </picker>
+      </view>
+      
+      <view v-if="popupType === 'h5'" class="setting-item">
+        <text class="setting-label">H5 URL</text>
+        <input 
+          v-model="h5Url"
+          placeholder="https://example.com"
+          class="setting-input"
+          @blur="updateSettings"
+        />
+      </view>
+      
+      <view v-if="popupType === 'html'" class="setting-item">
+        <text class="setting-label">HTML 内容</text>
+        <textarea 
+          v-model="htmlContent"
+          placeholder="输入 HTML 内容..."
+          class="setting-textarea"
+          @blur="updateSettings"
+        />
+      </view>
+      
+      <view class="setting-item">
+        <text class="setting-label">弹窗宽度</text>
+        <input 
+          v-model="popupWidth"
+          type="number"
+          class="setting-input"
+          min="300"
+          max="750"
+          @blur="updateSettings"
+        />
+      </view>
+      
+      <view class="setting-item">
+        <text class="setting-label">弹窗高度</text>
+        <input 
+          v-model="popupHeight"
+          type="number"
+          class="setting-input"
+          min="200"
+          max="1334"
+          @blur="updateSettings"
+        />
+      </view>
+      
+      <view class="setting-item">
+        <text class="setting-label">可拖拽</text>
+        <switch 
+          v-model="popupDraggable"
+          @change="updateSettings"
+        />
+      </view>
+      
+      <view class="setting-item">
+        <text class="setting-label">可调整大小</text>
+        <switch 
+          v-model="popupResizable"
+          @change="updateSettings"
+        />
+      </view>
+      
+      <view class="setting-item">
+        <text class="setting-label">自动关闭 (秒)</text>
+        <input 
+          v-model="popupAutoCloseDelay"
+          type="number"
+          class="setting-input"
+          min="0"
+          max="60"
+          @blur="updateSettings"
+        />
+      </view>
+    </view>
+
     <!-- 设置面板 -->
     <view class="settings-section">
-      <text class="section-title">设置</text>
+      <text class="section-title">通知设置</text>
       <view class="setting-item">
         <text class="setting-label">检查间隔 (秒)</text>
         <input 
@@ -131,11 +227,24 @@
         />
       </view>
     </view>
+
+    <!-- H5 弹窗组件 -->
+    <h5-popup-window
+      :visible="h5PopupVisible"
+      :app-info="currentAppInfo"
+      :config="popupConfig"
+      @close="closeH5Popup"
+      @action="handlePopupAction"
+      @minimize="handlePopupMinimize"
+      @maximize="handlePopupMaximize"
+      @error="handlePopupError"
+    />
   </view>
 </template>
 
 <script>
 import { createAppMonitor } from '@/uni_modules/app-monitor/utssdk/index.uts'
+import H5PopupWindow from '@/components/h5-popup-window/h5-popup-window.uvue'
 
 interface AppInfo {
   packageName: string;
@@ -153,6 +262,9 @@ interface MonitorConfig {
 }
 
 export default {
+  components: {
+    H5PopupWindow
+  },
   data() {
     return {
       appMonitor: null as any,
@@ -168,7 +280,79 @@ export default {
       checkInterval: 2,
       showNotification: true,
       notificationTitle: '检测到应用启动: {app}',
-      notificationContent: '应用 {app} 已启动\n时间: {time}'
+      notificationContent: '应用 {app} 已启动\n时间: {time}',
+      
+      // H5 弹窗相关数据
+      enableH5Popup: true,
+      popupTypes: ['默认', 'H5 URL', 'HTML 内容', 'uniapp 页面', '自定义组件'],
+      popupTypeIndex: 0,
+      h5Url: '/static/popup-demo.html',
+      htmlContent: `
+        <h3>🎉 应用启动提醒</h3>
+        <p>检测到应用 <strong>{app}</strong> 已启动！</p>
+        <p>启动时间: {time}</p>
+        <p>包名: {package}</p>
+        <div style="margin: 20px 0; padding: 15px; background: #f0f8ff; border-radius: 8px;">
+          <h4>📱 应用信息</h4>
+          <ul>
+            <li>应用名称: {app}</li>
+            <li>包名: {package}</li>
+            <li>进程ID: {pid}</li>
+          </ul>
+        </div>
+      `,
+      popupWidth: 600,
+      popupHeight: 400,
+      popupDraggable: true,
+      popupResizable: true,
+      popupAutoCloseDelay: 0,
+      h5PopupVisible: false,
+      currentAppInfo: {} as AppInfo
+    }
+  },
+  
+  computed: {
+    popupType(): string {
+      const typeMap = ['default', 'h5', 'html', 'uniapp', 'component']
+      return typeMap[this.popupTypeIndex] || 'default'
+    },
+    
+    popupConfig(): any {
+      const config: any = {
+        contentType: this.popupType,
+        width: this.popupWidth,
+        height: this.popupHeight,
+        draggable: this.popupDraggable,
+        resizable: this.popupResizable,
+        showHeader: true,
+        showFooter: true,
+        showMinimize: true,
+        showMaximize: true
+      }
+      
+      if (this.popupAutoCloseDelay > 0) {
+        config.autoClose = true
+        config.autoCloseDelay = this.popupAutoCloseDelay * 1000
+      }
+      
+      switch (this.popupType) {
+        case 'h5':
+          config.h5Url = this.h5Url
+          break
+        case 'html':
+          config.htmlContent = this.processHtmlContent()
+          break
+        case 'uniapp':
+          // 可以设置 uniapp 页面组件
+          break
+        case 'component':
+          // 可以设置自定义组件
+          break
+        default:
+          config.defaultContent = this.processDefaultContent()
+      }
+      
+      return config
     }
   },
   
@@ -201,6 +385,11 @@ export default {
         // 只保留最近50条记录
         if (this.launchHistory.length > 50) {
           this.launchHistory = this.launchHistory.slice(0, 50)
+        }
+        
+        // 显示 H5 弹窗
+        if (this.enableH5Popup) {
+          this.showH5Popup(appInfo)
         }
       })
     },
@@ -287,6 +476,77 @@ export default {
     formatTime(timestamp: number): string {
       const date = new Date(timestamp)
       return date.toLocaleString()
+    },
+    
+    // H5 弹窗相关方法
+    showH5Popup(appInfo: AppInfo) {
+      this.currentAppInfo = appInfo
+      this.h5PopupVisible = true
+    },
+    
+    closeH5Popup() {
+      this.h5PopupVisible = false
+    },
+    
+    handlePopupAction(action: any) {
+      console.log('弹窗操作:', action)
+      // 处理弹窗操作
+      switch (action.action) {
+        case 'confirm':
+          uni.showToast({
+            title: '确认操作',
+            icon: 'success'
+          })
+          break
+        case 'cancel':
+          uni.showToast({
+            title: '取消操作',
+            icon: 'none'
+          })
+          break
+        default:
+          console.log('未知操作:', action.action)
+      }
+    },
+    
+    handlePopupMinimize() {
+      console.log('弹窗最小化')
+    },
+    
+    handlePopupMaximize(isMaximized: boolean) {
+      console.log('弹窗最大化:', isMaximized)
+    },
+    
+    handlePopupError(error: any) {
+      console.error('弹窗错误:', error)
+      uni.showToast({
+        title: '弹窗加载失败',
+        icon: 'none'
+      })
+    },
+    
+    onPopupTypeChange(event: any) {
+      this.popupTypeIndex = event.detail.value
+      this.updateSettings()
+    },
+    
+    processHtmlContent(): string {
+      let content = this.htmlContent
+      if (this.currentAppInfo) {
+        content = content
+          .replace(/{app}/g, this.currentAppInfo.appName || '')
+          .replace(/{package}/g, this.currentAppInfo.packageName || '')
+          .replace(/{time}/g, this.formatTime(this.currentAppInfo.launchTime))
+          .replace(/{pid}/g, this.currentAppInfo.pid?.toString() || '')
+      }
+      return content
+    },
+    
+    processDefaultContent(): string {
+      if (this.currentAppInfo) {
+        return `应用 ${this.currentAppInfo.appName} 已启动！\n启动时间: ${this.formatTime(this.currentAppInfo.launchTime)}`
+      }
+      return '应用已启动！'
     }
   }
 }
@@ -522,5 +782,25 @@ export default {
   border-radius: 8rpx;
   padding: 20rpx;
   font-size: 28rpx;
+}
+
+.popup-config-section {
+  background: white;
+  border-radius: 16rpx;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.1);
+}
+
+.picker-value {
+  width: 200rpx;
+  height: 60rpx;
+  border: 1rpx solid #ddd;
+  border-radius: 8rpx;
+  padding: 0 20rpx;
+  font-size: 28rpx;
+  display: flex;
+  align-items: center;
+  color: #333;
 }
 </style>

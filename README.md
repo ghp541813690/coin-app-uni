@@ -7,9 +7,11 @@
 - 🔍 **应用监听**: 实时监听指定应用的启动事件
 - 📱 **跨平台支持**: 支持 Android 和 iOS 平台
 - 🔔 **自定义通知**: 支持自定义通知标题和内容
+- 🖥️ **H5 弹窗**: 支持显示自定义 H5 内容、HTML、CSS、JS 代码
 - ⚙️ **灵活配置**: 可配置检查间隔、目标应用列表等
 - 📊 **历史记录**: 记录应用启动历史
 - 🎨 **现代UI**: 采用现代化的用户界面设计
+- 🎯 **多种弹窗类型**: 支持 H5 URL、HTML 内容、uniapp 页面、自定义组件
 
 ## 技术栈
 
@@ -31,8 +33,10 @@
 │   ├── app-monitor/           # 应用监听器页面
 │   └── web-view/              # Web 应用页面
 ├── components/
-│   └── app-launch-popup/      # 应用启动弹窗组件
+│   ├── app-launch-popup/      # 应用启动弹窗组件
+│   └── h5-popup-window/       # H5 弹窗组件
 ├── static/                    # 静态资源
+│   └── popup-demo.html        # H5 弹窗示例页面
 └── manifest.json              # 应用配置
 ```
 
@@ -88,6 +92,15 @@
 #### 查看历史记录
 - 实时显示应用启动历史
 - 包含应用名称、包名、启动时间等信息
+
+#### 配置 H5 弹窗
+- **启用 H5 弹窗**: 开启/关闭 H5 弹窗功能
+- **弹窗类型**: 选择弹窗内容类型（默认、H5 URL、HTML 内容、uniapp 页面、自定义组件）
+- **H5 URL**: 设置要显示的 H5 页面地址
+- **HTML 内容**: 直接输入 HTML、CSS、JS 代码
+- **弹窗尺寸**: 设置弹窗的宽度和高度
+- **交互功能**: 支持拖拽、调整大小、最小化、最大化
+- **自动关闭**: 设置弹窗自动关闭时间
 
 ### 3. 权限管理
 
@@ -154,6 +167,52 @@ monitor.requestPermissions()
 1. 在应用监听器页面点击"添加"
 2. 输入应用包名（如：`com.example.app`）
 3. 点击确认添加
+
+### H5 弹窗配置示例
+
+#### 1. H5 URL 弹窗
+```javascript
+// 配置 H5 URL 弹窗
+const popupConfig = {
+  contentType: 'h5',
+  h5Url: 'https://example.com/popup.html',
+  width: 600,
+  height: 400,
+  draggable: true,
+  resizable: true
+}
+```
+
+#### 2. HTML 内容弹窗
+```javascript
+// 配置 HTML 内容弹窗
+const popupConfig = {
+  contentType: 'html',
+  htmlContent: `
+    <div style="padding: 20px; text-align: center;">
+      <h2>🎉 应用启动提醒</h2>
+      <p>检测到应用 <strong>{app}</strong> 已启动！</p>
+      <p>启动时间: {time}</p>
+      <button onclick="window.parent.postMessage({action: 'confirm'}, '*')">
+        确认
+      </button>
+    </div>
+  `,
+  width: 500,
+  height: 300
+}
+```
+
+#### 3. 自定义组件弹窗
+```javascript
+// 配置自定义组件弹窗
+const popupConfig = {
+  contentType: 'component',
+  customComponent: 'MyCustomPopup',
+  width: 600,
+  height: 400
+}
+```
 
 ### 常见应用包名
 
