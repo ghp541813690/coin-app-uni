@@ -12,7 +12,49 @@
       <view class="context-row"><text class="label">时间</text><text class="value">{{ formatTime(appInfo.launchTime) }}</text></view>
     </view>
 
-    <view class="form-card">
+    <!-- 表单模式切换 -->
+    <view class="form-mode-tabs">
+      <view 
+        v-for="(mode, i) in formModes"
+        :key="mode.key"
+        :class="['mode-tab', { active: formModeIndex === i }]"
+        @click="onTabChange(i)"
+      >
+        {{ mode.label }}
+      </view>
+    </view>
+
+    <!-- H5 URL 模式 -->
+    <view v-if="formMode === 'h5'" class="h5-section">
+      <view class="setting-item">
+        <text class="form-label">H5 URL</text>
+        <input class="form-input" placeholder="https://example.com" v-model="h5Url" />
+      </view>
+      <view class="h5-actions">
+        <button class="btn primary" @click="saveH5Url">保存</button>
+        <button class="btn secondary" @click="reloadH5">刷新</button>
+      </view>
+      <view class="h5-preview">
+        <web-view :src="h5Url" @message="handleWebMessage" @error="handleWebError"></web-view>
+      </view>
+    </view>
+
+    <!-- HTML 粘贴模式 -->
+    <view v-if="formMode === 'html'" class="html-section">
+      <text class="form-label">HTML 内容（可粘贴）</text>
+      <textarea class="form-textarea" style="height: 300rpx;" v-model="htmlContent" placeholder="在此粘贴或编写 HTML 代码..."></textarea>
+      <view class="h5-actions">
+        <button class="btn primary" @click="updateHtmlPreview">预览</button>
+        <button class="btn secondary" @click="pasteFromClipboard">从剪贴板粘贴</button>
+        <button class="btn secondary" @click="saveHtmlContent">保存</button>
+      </view>
+      <view class="h5-preview">
+        <web-view :src="htmlDataUrl" @message="handleWebMessage" @error="handleWebError"></web-view>
+      </view>
+    </view>
+
+    <!-- Schema 表单模式 -->
+    <view v-if="formMode === 'schema'" class="form-card">
       <view 
         v-for="(field, idx) in schema.fields" 
         :key="field.key || idx" 
@@ -123,18 +165,38 @@ interface FormSchema {
   cancelText?: string;
 }
 
+type FormMode = 'schema' | 'h5' | 'html'
+
 export default {
   data() {
     return {
       schema: { title: '自定义表单', fields: [] as FormField[] } as FormSchema,
       formValues: {} as Record<string, any>,
       errors: {} as Record<string, string>,
-      appInfo: null as AppInfo | null
+      appInfo: null as AppInfo | null,
+
+      // 表单模式与内容
+      formModes: [
+        { key: 'schema', label: 'Schema 表单' },
+        { key: 'h5', label: 'H5 URL' },
+        { key: 'html', label: 'HTML 粘贴' }
+      ] as Array<{key: FormMode, label: string}>,
+      formModeIndex: 0,
+      h5Url: '',
+      htmlContent: '',
+      htmlDataUrl: ''
     }
   },
 
   onLoad() {
     this.loadSchema()
+    this.loadFormMode()
+  },
+
+  computed: {
+    formMode(): FormMode {
+      return this.formModes[this.formModeIndex].key
+    }
   },
 
   methods: {
@@ -174,6 +236,91 @@ export default {
           this.appInfo = JSON.parse(ctx)
         }
       } catch {}
+    },
+
+    loadFormMode() {
+      try {
+        const raw = uni.getStorageSync('custom_form_mode') as string
+        if (raw) {
+          const { mode, h5Url, html } = JSON.parse(raw)
+          const idx = this.formModes.findIndex(m => m.key === mode)
+          if (idx >= 0) this.formModeIndex = idx
+          if (h5Url) this.h5Url = h5Url
+          if (html) {
+            this.htmlContent = html
+            this.updateHtmlPreview()
+          }
+        }
+      } catch {}
+    },
+
+    saveFormMode() {
+      uni.setStorageSync('custom_form_mode', JSON.stringify({
+        mode: this.formMode,
+        h5Url: this.h5Url,
+        html: this.htmlContent
+      }))
+    },
+
+    onTabChange(i: number) {
+      this.formModeIndex = i
+      this.saveFormMode()
+    },
+
+    saveH5Url() {
+      this.saveFormMode()
+      uni.showToast({ title: '已保存', icon: 'success' })
+    },
+
+    reloadH5() {
+      const url = this.h5Url
+      this.h5Url = ''
+      setTimeout(() => { this.h5Url = url }, 0)
+    },
+
+    updateHtmlPreview() {
+      const html = this.htmlContent || '<div style="padding:20px;color:#666">(空)</div>'
+      this.htmlDataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`
+      this.saveFormMode()
+    },
+
+    pasteFromClipboard() {
+      // 简化处理：尝试读取通用剪贴板（部分平台可能受限）
+      try {
+        const text = uni.getClipboardDataSync?.() as any
+        if (text) {
+          this.htmlContent = text
+          this.updateHtmlPreview()
+          uni.showToast({ title: '已粘贴', icon: 'success' })
+          return
+        }
+      } catch {}
+      uni.getClipboardData({
+        success: (res) => {
+          if (res && res.data) {
+            this.htmlContent = res.data
+            this.updateHtmlPreview()
+            uni.showToast({ title: '已粘贴', icon: 'success' })
+          }
+        },
+        fail: () => {
+          uni.showToast({ title: '读取剪贴板失败', icon: 'none' })
+        }
+      })
+    },
+
+    saveHtmlContent() {
+      this.saveFormMode()
+      uni.showToast({ title: '已保存', icon: 'success' })
+    },
+
+    handleWebMessage(e: any) {
+      console.log('H5 表单消息: ', e?.detail?.data)
+    },
+
+    handleWebError(err: any) {
+      console.error('H5 表单加载错误: ', err)
+      uni.showToast({ title: 'H5 加载失败', icon: 'none' })
     },
 
     selectIndex(field: any): number {
@@ -279,6 +426,28 @@ export default {
 }
 .label { color: #666; font-size: 26rpx; }
 .value { color: #333; font-size: 26rpx; }
+
+.form-mode-tabs {
+  display: flex;
+  background: #fff;
+  border-radius: 12rpx;
+  overflow: hidden;
+  margin-bottom: 16rpx;
+}
+.mode-tab {
+  flex: 1;
+  text-align: center;
+  padding: 20rpx 0;
+  color: #666;
+  background: #f5f5f5;
+}
+.mode-tab.active {
+  color: #fff;
+  background: #4CAF50;
+}
+.h5-section, .html-section { margin-bottom: 16rpx; }
+.h5-actions { display: flex; gap: 16rpx; margin: 12rpx 0; }
+.h5-preview { height: 600rpx; border: 1rpx solid #e9ecef; border-radius: 12rpx; overflow: hidden; }
 
 .form-card {
   background: #fff;
