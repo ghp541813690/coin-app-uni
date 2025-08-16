@@ -33,13 +33,7 @@ export class AppMonitorForegroundService extends Service {
     }
 
     onStartCommand(intent: Intent | null, flags: number, startId: number): number {
-        // 可通过 Intent 传入自定义间隔
-        try {
-            if (intent) {
-                const ms = intent.getIntExtra("interval", -1);
-                if (ms && ms > 0) this.checkIntervalMs = ms;
-            }
-        } catch {}
+        // 使用默认间隔时间
         return Service.START_STICKY;
     }
 
@@ -116,10 +110,9 @@ export class AppMonitorForegroundService extends Service {
 /**
  * 辅助方法：启动/停止前台服务
  */
-export function startAppMonitorForegroundService(context?: Context, intervalMs?: number): void {
+export function startAppMonitorForegroundService(context?: Context): void {
     const ctx = context || UTSAndroid.getUniActivity();
     const intent = new Intent(ctx, AppMonitorForegroundService.class);
-    if (intervalMs && intervalMs > 0) intent.putIntExtra("interval", intervalMs);
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         ctx.startForegroundService(intent);
     } else {

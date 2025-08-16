@@ -155,7 +155,7 @@ export class AppMonitor {
      */
     // #ifdef APP-ANDROID
     public startForegroundService(): void {
-        startAppMonitorForegroundService(this.context, this.config.checkInterval);
+        startAppMonitorForegroundService(this.context);
     }
     public stopForegroundService(): void {
         stopAppMonitorForegroundService(this.context);
