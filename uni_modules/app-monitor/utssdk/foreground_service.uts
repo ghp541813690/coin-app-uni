@@ -37,7 +37,7 @@ export class AppMonitorForegroundService extends Service {
         try {
             if (intent) {
                 const ms = intent.getLongExtra("interval", -1);
-                if (ms && ms > 0) this.checkIntervalMs = ms;
+                if (ms && ms > 0) this.checkIntervalMs = Number(ms);
             }
         } catch {}
         return Service.START_STICKY;
