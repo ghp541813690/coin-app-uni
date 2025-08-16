@@ -14,15 +14,17 @@ import android.content.Context;
 import android.app.usage.UsageEvents;
 import android.app.usage.UsageStatsManager;
 
-/**
- * 持续监控的前台服务
- */
 export class AppMonitorForegroundService extends Service {
-    private handler: Handler = new Handler(Looper.getMainLooper());
-    private usageStatsManager: UsageStatsManager = null as any;
-    private lastCheckTime: number = Date.now();
     private isRunning: boolean = false;
-    private checkIntervalMs: number = 2000;
+    private handler: Handler;
+    private usageStatsManager: UsageStatsManager;
+    private lastCheckTime: number = Date.now();
+    private checkIntervalMs: number = 1000; // 默认1秒检查一次
+
+    constructor() {
+        super();
+        this.handler = new Handler(Looper.getMainLooper());
+    }
 
     onCreate(): void {
         super.onCreate();
@@ -33,7 +35,6 @@ export class AppMonitorForegroundService extends Service {
     }
 
     onStartCommand(intent: Intent | null, flags: number, startId: number): number {
-        // 使用默认间隔时间
         return Service.START_STICKY;
     }
 
@@ -66,7 +67,7 @@ export class AppMonitorForegroundService extends Service {
 
         const notification = new Notification.Builder(this, channelId)
             .setContentTitle("应用监控运行中")
-            .setContentText("正在持续监控前台应用切换…")
+            .setContentText("正在持续监控前台应用切换...")
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setContentIntent(pending)
             .setOngoing(true)
@@ -97,7 +98,6 @@ export class AppMonitorForegroundService extends Service {
             events.getNextEvent(event);
             if (event.getEventType() == UsageEvents.Event.MOVE_TO_FOREGROUND) {
                 const pkg = event.getPackageName();
-                // 通过广播通知 App 进程，避免跨进程直接访问 uni.$emit
                 const intent = new Intent("app.monitor.APP_LAUNCHED");
                 intent.putExtra("package", pkg);
                 intent.putExtra("time", end);
@@ -107,9 +107,6 @@ export class AppMonitorForegroundService extends Service {
     }
 }
 
-/**
- * 辅助方法：启动/停止前台服务
- */
 export function startAppMonitorForegroundService(context?: Context): void {
     const ctx = context || UTSAndroid.getUniActivity();
     const intent = new Intent(ctx, AppMonitorForegroundService.class);
