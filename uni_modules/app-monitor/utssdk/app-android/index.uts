@@ -1,0 +1,122 @@
+
+import { UTSAndroid } from "io.dcloud.uts";
+import Context from "android.content.Context";
+import UsageStatsManager from "android.app.usage.UsageStatsManager";
+import SystemClock from "android.os.SystemClock";
+import PackageManager from "android.content.pm.PackageManager";
+import ApplicationInfo from "android.content.pm.ApplicationInfo";
+import Intent from "android.content.Intent";
+import Settings from "android.provider.Settings";
+import Uri from "android.net.Uri";
+import ActivityManager from "android.app.ActivityManager";
+import Process from "android.os.Process";
+
+function getAppContext(): Context {
+    return UTSAndroid.getAppContext() as Context;
+}
+
+// 类型定义
+type InstalledApp = {
+    pkg: string,
+    name: string
+};
+
+const context = getAppContext();
+
+
+// 检查 UsageStats 权限
+export function hasUsagePermission(): boolean {
+    try {
+        const usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager;
+        const endTime = SystemClock.elapsedRealtime();
+        const beginTime = endTime - 1000 * 60;
+        const stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, beginTime, endTime);
+        return stats != null && stats.size > 0;
+    } catch (e) {
+        return false;
+    }
+}
+
+// 引导用户去授权
+export function requestUsagePermission() {
+    const intent = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS);
+    intent.setData(Uri.parse("package:" + context.getPackageName()));
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+    context.startActivity(intent);
+}
+
+// 退出应用
+export function exitApp() {
+    const am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager;
+    am.killBackgroundProcesses(context.getPackageName());
+    Process.killProcess(Process.myPid());
+    System.exit(0);
+}
+
+export function checkPermission(){
+	if (!hasUsagePermission()) {
+	    requestUsagePermission();
+	
+	    // 延迟检查一次，若还是没授权 → 退出
+	    setTimeout(() => {
+	        if (!hasUsagePermission()) {
+	            exitApp();
+	        }
+	    }, 5000);
+	}
+}
+
+// 对外暴露：获取当前前台应用
+export function getForegroundAppPkg(): string | null {
+    if (!hasUsagePermission()) {
+        requestUsagePermission();
+
+        // 给用户 1s 选择机会，之后再检查一次
+        setTimeout(() => {
+            if (!hasUsagePermission()) {
+                // 用户拒绝授权，直接退出应用
+                exitApp();
+            }
+        }, 1000);
+
+        return null;
+    }
+
+    const usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager;
+    const endTime = SystemClock.elapsedRealtime();
+    const beginTime = endTime - 1000 * 60;
+
+    const usageEvents = usm.queryEvents(beginTime, endTime);
+    if (usageEvents == null) {
+        return null;
+    }
+
+    let lastPkg: string | null = null;
+    let event = new android.app.usage.UsageEvents.Event();
+    while (usageEvents.hasNextEvent()) {
+        usageEvents.getNextEvent(event);
+        if (event.getEventType() == android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND) {
+            lastPkg = event.getPackageName();
+        }
+    }
+    return lastPkg;
+}
+
+// 获取已安装应用
+export function getInstalledApps(): Array<InstalledApp> {
+    const ctx = getAppContext();
+    const pm = ctx.getPackageManager() as PackageManager;
+    const apps = pm.getInstalledApplications(PackageManager.GET_META_DATA);
+
+    let result = new Array<InstalledApp>();
+    let i: Int = 0;   // ✅ 注意这里是 number（会编译成 Int），不要写 Number
+    while (i < apps.size) {
+        const appInfo = apps.get(i) as ApplicationInfo;
+        if ((appInfo.flags & ApplicationInfo.FLAG_SYSTEM) == 0) {
+            const label = pm.getApplicationLabel(appInfo).toString();
+            result.push(new InstalledApp(appInfo.packageName, label));
+        }
+        i++;
+    }
+    return result;
+}

@@ -6,6 +6,7 @@
 <script lang="uts">
 // #ifdef APP-ANDROID
 import { KeepLive } from '@/uni_modules/android-keeplive'
+import { checkPermission,getForegroundAppPkg,getInstalledApps } from '@/uni_modules/app-monitor'
 // import { isProviderEnabled, openLocSetting,  onStartLocs,LocData,stop,LocationData} from "@/uni_modules/xtf-gpslocation"
 // #endif
 	
@@ -16,7 +17,7 @@ import { KeepLive } from '@/uni_modules/android-keeplive'
 		},
 		onShow: function () {
 			console.log('App Show')
-			// this.test();
+			this.test();
 		},
 		onHide: function () {
 			console.log('App Hide')
@@ -78,9 +79,11 @@ import { KeepLive } from '@/uni_modules/android-keeplive'
 				        keep.requestIgnoreBatteryOptimizations();
 				    }
 				}
+				
 				// 稳定定时器 需要的用户使用（默认定时器1 ）
 				keep.onStartCSystemTimer(120,function(){
 				    console.log("onStartCSystemTimer ");
+					
 				    keep.acquire(1000);// 唤醒一秒钟
 				});
 				
@@ -120,7 +123,11 @@ import { KeepLive } from '@/uni_modules/android-keeplive'
 				keep.wifilock();// 休眠时锁定wifi
 				keep.wifiunlock();// 休眠时取消锁定wifi
 				keep.toBackground();
+				checkPermission()
 				
+				var apps = getInstalledApps();
+				console.log("安装了应用："+apps)
+				console.log("正在使用："+getForegroundAppPkg())
 				// #endif
 			}
 		},

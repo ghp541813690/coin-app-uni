@@ -2,7 +2,7 @@
   "id": "app-monitor",
   "displayName": "应用监听器",
   "version": "1.0.0",
-  "description": "监听指定应用的启动事件，支持 Android 和 iOS 平台",
+  "description": "监听指定应用的启动事件，支持 Android",
   "keywords": [
     "app",
     "monitor",
@@ -31,7 +31,7 @@
     "declaration": {
       "ads": "无",
       "data": "无",
-      "permissions": "需要应用使用统计权限"
+      "permissions": "<uses-permission android:name=\"android.permission.PACKAGE_USAGE_STATS\" tools:ignore=\"ProtectedPermissions\" />   <uses-permission android:name=\"android.permission.QUERY_ALL_PACKAGES\" />"
     },
     "npmurl": ""
   },
